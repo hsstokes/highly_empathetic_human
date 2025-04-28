@@ -39,17 +39,22 @@
         }
         .control-button {
             position: absolute;
-            width: 70px;
-            height: 70px;
-            background-color: rgba(255,255,255,0.3);
+            width: 80px; /* Larger size */
+            height: 80px; /* Larger size */
+            background-color: rgba(255,255,255,0.5); /* More visible */
+            border: 3px solid rgba(0,0,0,0.3); /* Visible border */
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 30px;
-            color: white;
+            font-size: 36px; /* Larger font */
+            color: #333; /* Darker text */
             user-select: none;
             -webkit-user-select: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* Add shadow for depth */
+        }
+        .control-button:active {
+            background-color: rgba(200,200,200,0.7); /* Visual feedback */
         }
         #soundStatus {
             position: absolute;
@@ -63,6 +68,26 @@
             z-index: 100;
             display: none;
         }
+        /* Instructions overlay for mobile */
+        #mobileInstructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.6);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 90;
+            max-width: 80%;
+            transition: opacity 0.5s;
+        }
+        .hide-after {
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -70,6 +95,10 @@
         <button id="startButton">TAP TO START</button>
     </div>
     <div id="soundStatus">Sound: Initializing...</div>
+    <div id="mobileInstructions">
+        Use the control buttons to move and shoot.<br>
+        This message will disappear in a few seconds.
+    </div>
 
     <script>
         // Game variables
@@ -128,12 +157,17 @@
                     this.walkCount = 0;
                 }
                 
-                // Apply MULTIPLY blend mode (equivalent to pygame.BLEND_MULT)
-                push();
-                blendMode(MULTIPLY);
-                image(frames[this.walkCount], this.x, this.y, this.width, this.height);
-                blendMode(BLEND); // Reset blend mode
-                pop();
+                // Use raw canvas API for multiply blend mode
+                let ctx = drawingContext;
+                ctx.save();
+                ctx.globalCompositeOperation = 'multiply';
+                ctx.globalAlpha = 0.9; // Equivalent to set_alpha(230)
+                
+                // Draw the frame at exact dimensions
+                ctx.drawImage(frames[this.walkCount].canvas, this.x, this.y, this.width, this.height);
+                
+                // Restore canvas state
+                ctx.restore();
                 
                 this.walkCount += 1;
                 if (this.walkCount >= frames.length) {
@@ -199,8 +233,8 @@
             // Create soldier
             soldier = new Player(50, 250, 250, 250);
             
-            // Detect if we're on a mobile device
-            touchControls = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            // Always enable touch controls on mobile
+            touchControls = true;
             
             // Set up start button
             document.getElementById('startButton').addEventListener('click', startGame);
@@ -213,10 +247,8 @@
             const soundStatus = document.getElementById('soundStatus');
             soundStatus.style.display = 'block';
             
-            // Create mobile control elements if on mobile
-            if (touchControls) {
-                createMobileControls();
-            }
+            // Create mobile control elements
+            createMobileControls();
             
             frameRate(12); // Match your Pygame frame rate
             
@@ -232,7 +264,7 @@
         }
         
         function createMobileControls() {
-            const buttonSize = width / 8;
+            const buttonSize = min(width, height) / 6; // Larger buttons
             
             // Create control buttons
             leftButton = {
@@ -288,8 +320,6 @@
         }
         
         function hideControls() {
-            if (!touchControls) return;
-            
             leftButton.element.style('display', 'none');
             rightButton.element.style('display', 'none');
             upButton.element.style('display', 'none');
@@ -298,8 +328,6 @@
         }
         
         function showControls() {
-            if (!touchControls) return;
-            
             leftButton.element.style('display', 'flex');
             rightButton.element.style('display', 'flex');
             upButton.element.style('display', 'flex');
@@ -307,23 +335,62 @@
             fireButton.element.style('display', 'flex');
             
             // Set up touch handlers
-            leftButton.element.mousePressed(() => leftButton.pressed = true);
-            leftButton.element.mouseReleased(() => leftButton.pressed = false);
+            setupMobileTouchHandlers();
             
-            rightButton.element.mousePressed(() => rightButton.pressed = true);
-            rightButton.element.mouseReleased(() => rightButton.pressed = false);
+            // Show instructions temporarily
+            const instructions = document.getElementById('mobileInstructions');
+            instructions.style.opacity = 1;
             
-            upButton.element.mousePressed(() => upButton.pressed = true);
-            upButton.element.mouseReleased(() => upButton.pressed = false);
+            // Hide instructions after 5 seconds
+            setTimeout(() => {
+                instructions.classList.add('hide-after');
+            }, 5000);
+        }
+        
+        function setupMobileTouchHandlers() {
+            // Left button
+            leftButton.element.elt.addEventListener('touchstart', function(e) {
+                leftButton.pressed = true;
+                e.preventDefault();
+            });
+            leftButton.element.elt.addEventListener('touchend', function() {
+                leftButton.pressed = false;
+            });
             
-            downButton.element.mousePressed(() => downButton.pressed = true);
-            downButton.element.mouseReleased(() => downButton.pressed = false);
+            // Right button
+            rightButton.element.elt.addEventListener('touchstart', function(e) {
+                rightButton.pressed = true;
+                e.preventDefault();
+            });
+            rightButton.element.elt.addEventListener('touchend', function() {
+                rightButton.pressed = false;
+            });
             
-            fireButton.element.mousePressed(() => {
+            // Up button
+            upButton.element.elt.addEventListener('touchstart', function(e) {
+                upButton.pressed = true;
+                e.preventDefault();
+            });
+            upButton.element.elt.addEventListener('touchend', function() {
+                upButton.pressed = false;
+            });
+            
+            // Down button
+            downButton.element.elt.addEventListener('touchstart', function(e) {
+                downButton.pressed = true;
+                e.preventDefault();
+            });
+            downButton.element.elt.addEventListener('touchend', function() {
+                downButton.pressed = false;
+            });
+            
+            // Fire button
+            fireButton.element.elt.addEventListener('touchstart', function(e) {
                 if (shoot === 0) {
                     fireBullet();
                     shoot = 1;
                 }
+                e.preventDefault();
             });
         }
         
@@ -339,10 +406,8 @@
             // Simple sound initialization - no multiple attempts
             initSounds();
             
-            // Show mobile controls if needed
-            if (touchControls) {
-                showControls();
-            }
+            // Show mobile controls
+            showControls();
             
             // Start the game
             gameStarted = true;
@@ -423,10 +488,10 @@
                 bullets[i].draw();
             }
             
-            // Handle keyboard input
+            // Handle keyboard and touch input
             let moved = false;
             
-            if ((keyIsDown(LEFT_ARROW) || (touchControls && leftButton.pressed)) && soldier.x > 0) {
+            if ((keyIsDown(LEFT_ARROW) || leftButton.pressed) && soldier.x > 0) {
                 soldier.x -= soldier.vel;
                 soldier.left = true;
                 soldier.right = false;
@@ -436,7 +501,7 @@
                 soldier.last_direction = "left";
                 moved = true;
             } 
-            else if ((keyIsDown(RIGHT_ARROW) || (touchControls && rightButton.pressed)) && soldier.x < width - soldier.width) {
+            else if ((keyIsDown(RIGHT_ARROW) || rightButton.pressed) && soldier.x < width - soldier.width) {
                 soldier.x += soldier.vel;
                 soldier.right = true;
                 soldier.left = false;
@@ -450,7 +515,7 @@
             // Handle jumping mechanics
             if (!soldier.is_jump) {
                 // Start jump if UP is pressed and not already jumping
-                if ((keyIsDown(UP_ARROW) || (touchControls && upButton.pressed))) {
+                if ((keyIsDown(UP_ARROW) || upButton.pressed)) {
                     soldier.is_jump = true;
                     soldier.right = false;
                     soldier.left = false;
@@ -460,7 +525,7 @@
                     moved = true;
                 }
                 // Handle DOWN movement when not jumping
-                else if ((keyIsDown(DOWN_ARROW) || (touchControls && downButton.pressed)) && soldier.y < height - soldier.height) {
+                else if ((keyIsDown(DOWN_ARROW) || downButton.pressed) && soldier.y < height - soldier.height) {
                     soldier.y += soldier.vel;
                     soldier.down = true;
                     soldier.up = false;
@@ -512,9 +577,9 @@
                 resizeCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
             }
             
-            // Reposition mobile controls if needed
-            if (touchControls && gameStarted) {
-                const buttonSize = width / 8;
+            // Reposition mobile controls
+            if (gameStarted) {
+                const buttonSize = min(width, height) / 6;
                 
                 leftButton.x = buttonSize;
                 leftButton.y = height - buttonSize * 2;
