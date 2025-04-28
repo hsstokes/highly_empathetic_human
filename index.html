@@ -105,9 +105,9 @@
         // Mobile controls
         let leftButton, rightButton, upButton, downButton;
         
-        // Canvas dimensions
-        const W_WIDTH = 600;
-        const W_HEIGHT = 600;
+        // Canvas dimensions - Updated to 1920x1080
+        let W_WIDTH = 1920;
+        let W_HEIGHT = 1080;
         
         // Player class
         class Player {
@@ -279,10 +279,6 @@
         }
         
         function setup() {
-            // Update the world dimensions to match your background image
-            W_WIDTH = 1920;
-            W_HEIGHT = 1080;
-            
             // Create canvas matching game dimensions
             let canvas;
             if (windowWidth / windowHeight > W_WIDTH / W_HEIGHT) {
