@@ -97,7 +97,6 @@
         let gameStarted = false;
         let soundsLoaded = false;
         let soundInitialized = false;
-        let debugMode = false; // Set to false to disable debug info
         
         // Mobile controls
         let leftButton, rightButton, upButton, downButton;
@@ -271,17 +270,8 @@
             
             // Sound loading
             soundFormats('mp3', 'ogg');
-            bulletSound = loadSound('sounds/Bulletsound.mp3', () => {
-                console.log('Bullet sound loaded');
-            }, () => {
-                console.error('Bullet sound failed to load');
-            });
-            
-            hitSound = loadSound('sounds/Hit.mp3', () => {
-                console.log('Hit sound loaded');
-            }, () => {
-                console.error('Hit sound failed to load');
-            });
+            bulletSound = loadSound('sounds/Bulletsound.mp3');
+            hitSound = loadSound('sounds/Hit.mp3');
         }
         
         function setup() {
@@ -557,6 +547,43 @@
             }
         }
         
+        // KEYBOARD CONTROL HANDLERS
+        function keyPressed() {
+            if (keyCode === LEFT_ARROW) {
+                soldier.left = true;
+                soldier.right = false;
+                return false;
+            } else if (keyCode === RIGHT_ARROW) {
+                soldier.right = true;
+                soldier.left = false;
+                return false;
+            } else if (keyCode === UP_ARROW && !soldier.is_jump) {
+                soldier.is_jump = true;
+                return false;
+            } else if (keyCode === DOWN_ARROW) {
+                soldier.down = true;
+                return false;
+            } else if (keyCode === 32) { // Space key
+                if (shoot === 0) {
+                    createCircles();
+                }
+                return false;
+            }
+        }
+        
+        function keyReleased() {
+            if (keyCode === LEFT_ARROW) {
+                soldier.left = false;
+                return false;
+            } else if (keyCode === RIGHT_ARROW) {
+                soldier.right = false;
+                return false;
+            } else if (keyCode === DOWN_ARROW) {
+                soldier.down = false;
+                return false;
+            }
+        }
+        
         function draw() {
             if (!gameStarted) return;
             
@@ -575,24 +602,6 @@
             
             // Movement logic
             soldier.move();
-            
-            // Handle space key for circles (desktop)
-            if (keyIsDown(32) && shoot === 0) { // 32 is space key
-                createCircles();
-            }
-            
-            // Use keyboard arrows too
-            if (keyIsDown(LEFT_ARROW)) {
-                soldier.left = true;
-                soldier.right = false;
-            } else if (keyIsDown(RIGHT_ARROW)) {
-                soldier.right = true;
-                soldier.left = false;
-            } else if (!soldier.left && !soldier.right) {
-                // Only reset these if touch isn't active
-                soldier.left = false;
-                soldier.right = false;
-            }
             
             // Handle shoot cooldown
             if (shoot > 0) {
