@@ -109,6 +109,20 @@
         #soundButton:active {
             background-color: rgba(200,200,200,0.5);
         }
+        
+        /* Debug info display */
+        #debugInfo {
+            position: absolute;
+            top: 40px;
+            left: 10px;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 10px;
+            z-index: 100;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -121,6 +135,7 @@
         This message will disappear in a few seconds.
     </div>
     <div id="soundButton">●</div>
+    <div id="debugInfo">Status: -</div>
 
     <script>
         // Game variables
@@ -133,6 +148,7 @@
         let gameStarted = false;
         let soundsLoaded = false;
         let soundInitialized = false;
+        let debugMode = true;
         
         // Mobile controls
         let leftButton, rightButton, upButton, downButton;
@@ -167,6 +183,8 @@
             }
             
             draw() {
+                updateDebugInfo();
+                
                 let frames;
                 if (this.right || this.last_direction === "right") {
                     frames = walkRight;
@@ -204,6 +222,42 @@
                     width: this.width - 150,
                     height: this.height - 150
                 };
+            }
+            
+            move() {
+                // FIXED: Movement logic is now in its own function
+                if (this.left && this.x > 0) {
+                    this.x -= this.vel;
+                    this.last_direction = "left";
+                    this.standing = false;
+                    updateDebugInfo("Moving left: " + this.x);
+                } 
+                else if (this.right && this.x < width - this.width) {
+                    this.x += this.vel;
+                    this.last_direction = "right";
+                    this.standing = false;
+                    updateDebugInfo("Moving right: " + this.x);
+                }
+                else {
+                    this.standing = true;
+                }
+                
+                // Handle jumping mechanics
+                if (this.is_jump) {
+                    if (this.jump_count >= -10) {
+                        const neg = this.jump_count < 0 ? -1 : 1;
+                        this.y -= (this.jump_count ** 2) * neg * 0.5;
+                        this.jump_count -= 1;
+                    } else {
+                        this.is_jump = false;
+                        this.jump_count = 10;
+                    }
+                }
+                
+                // Handle down movement when not jumping
+                if (this.down && !this.is_jump && this.y < height - this.height) {
+                    this.y += this.vel;
+                }
             }
         }
         
@@ -256,6 +310,20 @@
             
             isFinished() {
                 return this.age >= this.lifetime;
+            }
+        }
+        
+        function updateDebugInfo(message) {
+            if (debugMode && gameStarted) {
+                const debugEl = document.getElementById('debugInfo');
+                if (debugEl) {
+                    if (message) {
+                        debugEl.textContent = message;
+                    } else {
+                        debugEl.textContent = `L:${soldier.left} R:${soldier.right} X:${Math.round(soldier.x)} Dir:${soldier.last_direction}`;
+                    }
+                    debugEl.style.display = 'block';
+                }
             }
         }
         
@@ -330,26 +398,32 @@
         }
         
         function createMobileControls() {
-            // Create smaller, more subtle controls at the edges of the screen
-            const bottomPadding = 20;
-            const buttonSize = 50; // Smaller size
+            // Create control buttons with direct DOM manipulation
+            leftButton = createElement('div', '←');
+            leftButton.class('control-button');
+            leftButton.position(20, height - 70);
+            document.body.appendChild(leftButton.elt);
             
-            // Create control buttons
-            leftButton = createControlButton('←', 20, height - buttonSize - bottomPadding);
-            rightButton = createControlButton('→', width - buttonSize - 20, height - buttonSize - bottomPadding);
-            upButton = createControlButton('↑', width/2 - buttonSize/2, height - buttonSize - bottomPadding - 70);
-            downButton = createControlButton('↓', width/2 - buttonSize/2, height - buttonSize - bottomPadding);
+            rightButton = createElement('div', '→');
+            rightButton.class('control-button');
+            rightButton.position(width - 70, height - 70);
+            document.body.appendChild(rightButton.elt);
+            
+            upButton = createElement('div', '↑');
+            upButton.class('control-button');
+            upButton.position(width/2 - 25, height - 140);
+            document.body.appendChild(upButton.elt);
+            
+            downButton = createElement('div', '↓');
+            downButton.class('control-button');
+            downButton.position(width/2 - 25, height - 70);
+            document.body.appendChild(downButton.elt);
+            
+            // Add direct event listeners with different approach
+            setupMobileTouchHandlers();
             
             // Hide controls until game starts
             hideControls();
-        }
-        
-        function createControlButton(symbol, x, y) {
-            const button = createElement('div', symbol);
-            button.class('control-button');
-            button.position(x, y);
-            document.body.appendChild(button.elt);
-            return button;
         }
         
         function hideControls() {
@@ -367,9 +441,6 @@
             downButton.style('display', 'flex');
             document.getElementById('soundButton').style.display = 'flex';
             
-            // Set up touch handlers
-            setupMobileTouchHandlers();
-            
             // Show instructions temporarily
             const instructions = document.getElementById('mobileInstructions');
             instructions.style.opacity = 1;
@@ -381,44 +452,61 @@
         }
         
         function setupMobileTouchHandlers() {
-            // FIXED LEFT MOVEMENT
-            leftButton.elt.addEventListener('touchstart', function(e) {
+            // COMPLETELY REWRITTEN MOBILE CONTROLS - USE DOM EVENTS INSTEAD OF P5
+            
+            // Left button - using direct DOM events
+            leftButton.elt.ontouchstart = function(e) {
                 soldier.left = true;
                 soldier.right = false;
-                soldier.last_direction = "left";
+                updateDebugInfo("LEFT pressed");
                 e.preventDefault();
-            });
-            leftButton.elt.addEventListener('touchend', function() {
-                soldier.left = false;
-            });
+            };
             
-            // FIXED RIGHT MOVEMENT
-            rightButton.elt.addEventListener('touchstart', function(e) {
+            leftButton.elt.ontouchend = function() {
+                soldier.left = false;
+                updateDebugInfo("LEFT released");
+            };
+            
+            // Right button
+            rightButton.elt.ontouchstart = function(e) {
                 soldier.right = true;
                 soldier.left = false;
-                soldier.last_direction = "right";
+                updateDebugInfo("RIGHT pressed");
                 e.preventDefault();
-            });
-            rightButton.elt.addEventListener('touchend', function() {
+            };
+            
+            rightButton.elt.ontouchend = function() {
                 soldier.right = false;
-            });
+                updateDebugInfo("RIGHT released");
+            };
             
             // Up button
-            upButton.elt.addEventListener('touchstart', function(e) {
+            upButton.elt.ontouchstart = function(e) {
                 if (!soldier.is_jump) {
                     soldier.is_jump = true;
+                    updateDebugInfo("UP pressed - jumping");
                 }
                 e.preventDefault();
-            });
+            };
             
             // Down button
-            downButton.elt.addEventListener('touchstart', function(e) {
+            downButton.elt.ontouchstart = function(e) {
                 soldier.down = true;
+                updateDebugInfo("DOWN pressed");
                 e.preventDefault();
-            });
-            downButton.elt.addEventListener('touchend', function() {
+            };
+            
+            downButton.elt.ontouchend = function() {
                 soldier.down = false;
-            });
+                updateDebugInfo("DOWN released");
+            };
+            
+            // Sound button
+            document.getElementById('soundButton').ontouchstart = function(e) {
+                createCircles();
+                updateDebugInfo("SOUND pressed");
+                e.preventDefault();
+            };
         }
         
         function startGame() {
@@ -441,6 +529,11 @@
             
             // Start the game
             gameStarted = true;
+            
+            // Debug
+            if (debugMode) {
+                document.getElementById('debugInfo').style.display = 'block';
+            }
         }
         
         // Function to unlock audio on iOS
@@ -582,39 +675,25 @@
                 }
             }
             
-            // FIXED: Update character position based on controls
-            if (soldier.left && soldier.x > 0) {
-                soldier.x -= soldier.vel;
-                soldier.standing = false;
-            } 
-            else if (soldier.right && soldier.x < width - soldier.width) {
-                soldier.x += soldier.vel;
-                soldier.standing = false;
-            }
-            else {
-                soldier.standing = true;
-            }
-            
-            // Handle jumping mechanics
-            if (soldier.is_jump) {
-                if (soldier.jump_count >= -10) {
-                    const neg = soldier.jump_count < 0 ? -1 : 1;
-                    soldier.y -= (soldier.jump_count ** 2) * neg * 0.5;
-                    soldier.jump_count -= 1;
-                } else {
-                    soldier.is_jump = false;
-                    soldier.jump_count = 10;
-                }
-            }
-            
-            // Handle down movement when not jumping
-            if (soldier.down && !soldier.is_jump && soldier.y < height - soldier.height) {
-                soldier.y += soldier.vel;
-            }
+            // COMPLETELY MOVED MOVEMENT LOGIC TO SOLDIER CLASS
+            soldier.move();
             
             // Handle space key for circles (desktop)
             if (keyIsDown(32) && shoot === 0) { // 32 is space key
                 createCircles();
+            }
+            
+            // Use keyboard arrows too
+            if (keyIsDown(LEFT_ARROW)) {
+                soldier.left = true;
+                soldier.right = false;
+            } else if (keyIsDown(RIGHT_ARROW)) {
+                soldier.right = true;
+                soldier.left = false;
+            } else if (!soldier.left && !soldier.right) {
+                // Only reset these if touch isn't active
+                soldier.left = false;
+                soldier.right = false;
             }
             
             // Handle shoot cooldown
@@ -639,17 +718,14 @@
             
             // Reposition mobile controls
             if (gameStarted) {
-                const bottomPadding = 20;
-                const buttonSize = 50;
-                
-                leftButton.position(20, height - buttonSize - bottomPadding);
-                rightButton.position(width - buttonSize - 20, height - buttonSize - bottomPadding);
-                upButton.position(width/2 - buttonSize/2, height - buttonSize - bottomPadding - 70);
-                downButton.position(width/2 - buttonSize/2, height - buttonSize - bottomPadding);
+                leftButton.position(20, height - 70);
+                rightButton.position(width - 70, height - 70);
+                upButton.position(width/2 - 25, height - 140);
+                downButton.position(width/2 - 25, height - 70);
                 
                 // Adjust sound button
                 const soundBtn = document.getElementById('soundButton');
-                soundBtn.style.bottom = (bottomPadding + 70) + 'px';
+                soundBtn.style.bottom = '140px';
             }
         }
         
