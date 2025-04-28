@@ -279,6 +279,10 @@
         }
         
         function setup() {
+            // Update the world dimensions to match your background image
+            W_WIDTH = 1920;
+            W_HEIGHT = 1080;
+            
             // Create canvas matching game dimensions
             let canvas;
             if (windowWidth / windowHeight > W_WIDTH / W_HEIGHT) {
