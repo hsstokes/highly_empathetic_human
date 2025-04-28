@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Animated Soldier</title>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+        }
+        #startOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #startButton {
+            padding: 20px 40px;
+            font-size: 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .control-button {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            background-color: rgba(255,255,255,0.3);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #soundStatus {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="startOverlay">
+        <button id="startButton">TAP TO START</button>
+    </div>
+    <div id="soundStatus">Sound: Initializing...</div>
+
+    <script>
+        // Game variables
+        let walkRight = [];
+        let walkLeft = [];
+        let gridImg;
+        let bulletSound, hitSound;
+        let bullets = [];
+        let shoot = 0;
+        let gameStarted = false;
+        let soundsLoaded = false;
+        let touchControls = false;
+        let soundInitialized = false;
+        
+        // Mobile controls
+        let leftButton, rightButton, upButton, downButton, fireButton;
+        
+        // Canvas dimensions
+        const W_WIDTH = 600;
+        const W_HEIGHT = 600;
+        
+        // Player class (matches your Python class)
+        class Player {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.vel = 4;
+                this.is_jump = false;
+                this.jump_count = 10;
+                this.left = false;
+                this.right = false;
+                this.up = false;
+                this.down = false;
+                this.walkCount = 0;
+                this.standing = true;
+                this.last_direction = "right";
+                this.hitbox = {
+                    x: this.x + 75,
+                    y: this.y + 75,
+                    width: this.width - 150,
+                    height: this.height - 150
+                };
+            }
+            
+            draw() {
+                let frames;
+                if (this.right || this.last_direction === "right") {
+                    frames = walkRight;
+                } else {
+                    frames = walkLeft;
+                }
+                
+                if (this.walkCount >= frames.length) {
+                    this.walkCount = 0;
+                }
+                
+                // Draw with transparency (equivalent to alpha=230)
+                push();
+                tint(255, 230);
+                image(frames[this.walkCount], this.x, this.y, this.width, this.height);
+                pop();
+                
+                this.walkCount += 1;
+                if (this.walkCount >= frames.length) {
+                    this.walkCount = 0;
+                }
+                
+                // Update hitbox with current position
+                this.hitbox = {
+                    x: this.x + 75,
+                    y: this.y + 75,
+                    width: this.width - 150,
+                    height: this.height - 150
+                };
+            }
+        }
+        
+        // Projectile class (matches your Python class)
+        class Projectile {
+            constructor(x, y, radius, colour, direction) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.colour = colour;
+                this.direction = direction;
+                this.vel = 8 * direction;
+            }
+            
+            draw() {
+                fill(this.colour);
+                noStroke();
+                circle(this.x, this.y, this.radius * 2);
+            }
+        }
+        
+        // Preload assets
+        function preload() {
+            // Load background
+            gridImg = loadImage('images/grid_img.jpeg');
+            
+            // Load soldier images
+            for (let i = 1; i <= 6; i++) {
+                walkRight.push(loadImage(`soldier/${i}.png`));
+                walkLeft.push(loadImage(`soldier/L${i}.png`));
+            }
+            
+            // Load sounds (will activate after user interaction)
+            try {
+                soundFormats('mp3', 'ogg'); // Support both formats
+                bulletSound = loadSound(['sounds/Bulletsound.mp3', 'sounds/Bulletsound.ogg'], 
+                    () => console.log("Bullet sound loaded"),
+                    (e) => console.error("Failed to load bullet sound:", e)
+                );
+                hitSound = loadSound(['sounds/Hit.mp3', 'sounds/Hit.ogg'],
+                    () => console.log("Hit sound loaded"),
+                    (e) => console.error("Failed to load hit sound:", e)
+                );
+            } catch(e) {
+                console.error("Sound loading exception:", e);
+                // Create empty sound objects as fallbacks
+                bulletSound = { 
+                    play: () => {}, 
+                    stop: () => {}, 
+                    isPlaying: () => false,
+                    isLoaded: () => false 
+                };
+                hitSound = { 
+                    play: () => {}, 
+                    stop: () => {},
+                    isPlaying: () => false,
+                    isLoaded: () => false
+                };
+            }
+        }
+        
+        function setup() {
+            // Create canvas matching game dimensions
+            let canvas;
+            if (windowWidth / windowHeight > W_WIDTH / W_HEIGHT) {
+                // Screen is wider than game aspect ratio
+                canvas = createCanvas(windowHeight * (W_WIDTH / W_HEIGHT), windowHeight);
+            } else {
+                // Screen is taller than game aspect ratio
+                canvas = createCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
+            }
+            
+            // Create soldier
+            soldier = new Player(50, 250, 250, 250);
+            
+            // Detect if we're on a mobile device
+            touchControls = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Set up start button
+            document.getElementById('startButton').addEventListener('click', startGame);
+            document.getElementById('startButton').addEventListener('touchstart', function(e) {
+                startGame();
+                e.preventDefault();
+            });
+            
+            // Enable sound status display
+            const soundStatus = document.getElementById('soundStatus');
+            soundStatus.style.display = 'block';
+            
+            // Create mobile control elements if on mobile
+            if (touchControls) {
+                createMobileControls();
+            }
+            
+            frameRate(12); // Match your Pygame frame rate
+            
+            // Create AudioContext manually to help with sound issues
+            window.AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!window.audioContext) {
+                try {
+                    window.audioContext = new AudioContext();
+                } catch(e) {
+                    console.error("Could not create AudioContext:", e);
+                }
+            }
+        }
+        
+        function createMobileControls() {
+            const buttonSize = width / 8;
+            
+            // Create control buttons
+            leftButton = {
+                x: buttonSize, 
+                y: height - buttonSize * 2,
+                size: buttonSize * 1.5,
+                pressed: false,
+                element: createControlButton('←', buttonSize, height - buttonSize * 2)
+            };
+            
+            rightButton = {
+                x: buttonSize * 3.5, 
+                y: height - buttonSize * 2,
+                size: buttonSize * 1.5,
+                pressed: false,
+                element: createControlButton('→', buttonSize * 3.5, height - buttonSize * 2)
+            };
+            
+            upButton = {
+                x: buttonSize * 2.25, 
+                y: height - buttonSize * 3.5,
+                size: buttonSize * 1.5,
+                pressed: false,
+                element: createControlButton('↑', buttonSize * 2.25, height - buttonSize * 3.5)
+            };
+            
+            downButton = {
+                x: buttonSize * 2.25, 
+                y: height - buttonSize * 0.5,
+                size: buttonSize * 1.5,
+                pressed: false,
+                element: createControlButton('↓', buttonSize * 2.25, height - buttonSize * 0.5)
+            };
+            
+            fireButton = {
+                x: width - buttonSize * 2, 
+                y: height - buttonSize * 2,
+                size: buttonSize * 2,
+                pressed: false,
+                element: createControlButton('🔫', width - buttonSize * 2, height - buttonSize * 2)
+            };
+            
+            // Hide controls until game starts
+            hideControls();
+        }
+        
+        function createControlButton(symbol, x, y) {
+            const button = createElement('div', symbol);
+            button.class('control-button');
+            button.position(x, y);
+            document.body.appendChild(button.elt);
+            return button;
+        }
+        
+        function hideControls() {
+            if (!touchControls) return;
+            
+            leftButton.element.style('display', 'none');
+            rightButton.element.style('display', 'none');
+            upButton.element.style('display', 'none');
+            downButton.element.style('display', 'none');
+            fireButton.element.style('display', 'none');
+        }
+        
+        function showControls() {
+            if (!touchControls) return;
+            
+            leftButton.element.style('display', 'flex');
+            rightButton.element.style('display', 'flex');
+            upButton.element.style('display', 'flex');
+            downButton.element.style('display', 'flex');
+            fireButton.element.style('display', 'flex');
+            
+            // Set up touch handlers
+            leftButton.element.mousePressed(() => leftButton.pressed = true);
+            leftButton.element.mouseReleased(() => leftButton.pressed = false);
+            
+            rightButton.element.mousePressed(() => rightButton.pressed = true);
+            rightButton.element.mouseReleased(() => rightButton.pressed = false);
+            
+            upButton.element.mousePressed(() => upButton.pressed = true);
+            upButton.element.mouseReleased(() => upButton.pressed = false);
+            
+            downButton.element.mousePressed(() => downButton.pressed = true);
+            downButton.element.mouseReleased(() => downButton.pressed = false);
+            
+            fireButton.element.mousePressed(() => {
+                if (shoot === 0) {
+                    fireBullet();
+                    shoot = 1;
+                }
+            });
+        }
+        
+        function startGame() {
+            // Remove overlay
+            document.getElementById('startOverlay').style.display = 'none';
+            
+            // Resume AudioContext if suspended
+            if (window.audioContext && window.audioContext.state === 'suspended') {
+                window.audioContext.resume();
+            }
+            
+            // Initialize sounds with multiple attempts
+            initSounds();
+            
+            // Show mobile controls if needed
+            if (touchControls) {
+                showControls();
+            }
+            
+            // Start the game
+            gameStarted = true;
+        }
+        
+        function initSounds() {
+            // Update sound status
+            document.getElementById('soundStatus').textContent = 'Sound: Initializing...';
+            
+            // Try to initialize sounds with multiple attempts
+            let initAttempts = 0;
+            const maxAttempts = 3;
+            
+            function attemptInit() {
+                try {
+                    // Try to unlock the audio context
+                    if (window.audioContext && window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    }
+                    
+                    // Play and immediately stop both sounds to initialize them
+                    if (bulletSound && typeof bulletSound.play === 'function') {
+                        bulletSound.play();
+                        bulletSound.stop();
+                    }
+                    
+                    if (hitSound && typeof hitSound.play === 'function') {
+                        hitSound.play();
+                        hitSound.stop();
+                    }
+                    
+                    // Verify sounds are loaded
+                    if ((bulletSound && bulletSound.isLoaded && bulletSound.isLoaded()) ||
+                        (hitSound && hitSound.isLoaded && hitSound.isLoaded())) {
+                        soundsLoaded = true;
+                        soundInitialized = true;
+                        document.getElementById('soundStatus').textContent = 'Sound: Ready';
+                        
+                        // Play a test sound to confirm it's working
+                        setTimeout(() => {
+                            try {
+                                if (bulletSound && typeof bulletSound.play === 'function') {
+                                    bulletSound.play();
+                                }
+                            } catch(e) {
+                                console.log("Test sound playback error:", e);
+                            }
+                        }, 500);
+                        
+                        return;
+                    }
+                    
+                    // If not initialized and we haven't reached max attempts, try again
+                    initAttempts++;
+                    if (initAttempts < maxAttempts) {
+                        document.getElementById('soundStatus').textContent = `Sound: Retry ${initAttempts}/${maxAttempts}...`;
+                        setTimeout(attemptInit, 300);
+                    } else {
+                        document.getElementById('soundStatus').textContent = 'Sound: Failed (continue without sound)';
+                    }
+                } catch(e) {
+                    console.error("Sound initialization failed:", e);
+                    document.getElementById('soundStatus').textContent = 'Sound: Error';
+                    
+                    // Try one more time after a delay
+                    if (initAttempts < maxAttempts) {
+                        initAttempts++;
+                        setTimeout(attemptInit, 500);
+                    }
+                }
+            }
+            
+            // Start the initialization attempts
+            attemptInit();
+        }
+        
+        function fireBullet() {
+            // Play sounds if loaded
+            if (soundsLoaded) {
+                try {
+                    // Use touch event to help unlock sound on iOS
+                    if (window.audioContext && window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    }
+                    
+                    if (bulletSound && typeof bulletSound.play === 'function') {
+                        bulletSound.play();
+                    }
+                    if (hitSound && typeof hitSound.play === 'function') {
+                        hitSound.play();
+                    }
+                } catch(e) {
+                    console.log("Sound playback error:", e);
+                    
+                    // If sound fails after being initialized, try to re-initialize
+                    if (soundInitialized) {
+                        soundInitialized = false;
+                        setTimeout(initSounds, 100);
+                    }
+                }
+            }
+            
+            // Determine direction based on soldier facing
+            const direction = (soldier.right || soldier.last_direction === "right") ? 1 : -1;
+            
+            // Create new bullet
+            if (bullets.length < 5) {
+                bullets.push(new Projectile(
+                    soldier.x + soldier.width / 2,
+                    soldier.y + soldier.height / 2,
+                    6, 
+                    color(0, 100, 0), // dark green
+                    direction
+                ));
+            }
+        }
+        
+        function draw() {
+            if (!gameStarted) return;
+            
+            // Draw background
+            image(gridImg, 0, 0, width, height);
+            
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].x += bullets[i].vel;
+                
+                // Remove bullets that are off-screen
+                if (bullets[i].x < 0 || bullets[i].x > width) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+                
+                bullets[i].draw();
+            }
+            
+            // Handle keyboard input
+            let moved = false;
+            
+            if ((keyIsDown(LEFT_ARROW) || (touchControls && leftButton.pressed)) && soldier.x > 0) {
+                soldier.x -= soldier.vel;
+                soldier.left = true;
+                soldier.right = false;
+                soldier.up = false;
+                soldier.down = false;
+                soldier.standing = false;
+                soldier.last_direction = "left";
+                moved = true;
+            } 
+            else if ((keyIsDown(RIGHT_ARROW) || (touchControls && rightButton.pressed)) && soldier.x < width - soldier.width) {
+                soldier.x += soldier.vel;
+                soldier.right = true;
+                soldier.left = false;
+                soldier.up = false;
+                soldier.down = false;
+                soldier.standing = false;
+                soldier.last_direction = "right";
+                moved = true;
+            }
+            
+            // Handle jumping mechanics
+            if (!soldier.is_jump) {
+                // Start jump if UP is pressed and not already jumping
+                if ((keyIsDown(UP_ARROW) || (touchControls && upButton.pressed))) {
+                    soldier.is_jump = true;
+                    soldier.right = false;
+                    soldier.left = false;
+                    soldier.up = true;
+                    soldier.down = false;
+                    soldier.standing = false;
+                    moved = true;
+                }
+                // Handle DOWN movement when not jumping
+                else if ((keyIsDown(DOWN_ARROW) || (touchControls && downButton.pressed)) && soldier.y < height - soldier.height) {
+                    soldier.y += soldier.vel;
+                    soldier.down = true;
+                    soldier.up = false;
+                    soldier.left = false;
+                    soldier.right = false;
+                    soldier.standing = false;
+                    moved = true;
+                }
+            } else {
+                // Handle jumping physics
+                if (soldier.jump_count >= -10) {
+                    const neg = soldier.jump_count < 0 ? -1 : 1;
+                    soldier.y -= (soldier.jump_count ** 2) * neg * 0.5;
+                    soldier.jump_count -= 1;
+                    moved = true;
+                } else {
+                    soldier.is_jump = false;
+                    soldier.jump_count = 10;
+                }
+            }
+            
+            if (!moved) {
+                soldier.standing = true;
+            }
+            
+            // Handle space key for shooting (desktop)
+            if (keyIsDown(32) && shoot === 0) { // 32 is space key
+                fireBullet();
+                shoot = 1;
+            }
+            
+            // Handle shoot cooldown
+            if (shoot > 0) {
+                shoot += 1;
+            }
+            if (shoot > 3) {
+                shoot = 0;
+            }
+            
+            // Draw soldier
+            soldier.draw();
+        }
+        
+        function windowResized() {
+            // Resize canvas maintaining aspect ratio
+            if (windowWidth / windowHeight > W_WIDTH / W_HEIGHT) {
+                resizeCanvas(windowHeight * (W_WIDTH / W_HEIGHT), windowHeight);
+            } else {
+                resizeCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
+            }
+            
+            // Reposition mobile controls if needed
+            if (touchControls && gameStarted) {
+                const buttonSize = width / 8;
+                
+                leftButton.x = buttonSize;
+                leftButton.y = height - buttonSize * 2;
+                leftButton.element.position(leftButton.x, leftButton.y);
+                
+                rightButton.x = buttonSize * 3.5;
+                rightButton.y = height - buttonSize * 2;
+                rightButton.element.position(rightButton.x, rightButton.y);
+                
+                upButton.x = buttonSize * 2.25;
+                upButton.y = height - buttonSize * 3.5;
+                upButton.element.position(upButton.x, upButton.y);
+                
+                downButton.x = buttonSize * 2.25;
+                downButton.y = height - buttonSize * 0.5;
+                downButton.element.position(downButton.x, downButton.y);
+                
+                fireButton.x = width - buttonSize * 2;
+                fireButton.y = height - buttonSize * 2;
+                fireButton.element.position(fireButton.x, fireButton.y);
+            }
+        }
+        
+        // Additional handler to help with iOS audio
+        function touchStarted() {
+            if (window.audioContext && window.audioContext.state === 'suspended') {
+                window.audioContext.resume();
+            }
+        }
+    </script>
+</body>
+</html>
