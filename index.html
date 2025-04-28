@@ -56,37 +56,6 @@
         .control-button:active {
             background-color: rgba(200,200,200,0.5);
         }
-        #soundStatus {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0,0,0,0.5);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 100;
-            display: none;
-        }
-        #mobileInstructions {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0,0,0,0.6);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 5px;
-            font-size: 12px;
-            text-align: center;
-            z-index: 90;
-            max-width: 80%;
-            transition: opacity 0.5s;
-        }
-        .hide-after {
-            opacity: 0;
-            pointer-events: none;
-        }
         #soundButton {
             position: absolute;
             bottom: 70px;
@@ -109,33 +78,13 @@
         #soundButton:active {
             background-color: rgba(200,200,200,0.5);
         }
-        
-        /* Debug info display */
-        #debugInfo {
-            position: absolute;
-            top: 40px;
-            left: 10px;
-            background-color: rgba(0,0,0,0.5);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 10px;
-            z-index: 100;
-            display: none;
-        }
     </style>
 </head>
 <body>
     <div id="startOverlay">
         <button id="startButton">TAP TO START</button>
     </div>
-    <div id="soundStatus">Sound: Initializing...</div>
-    <div id="mobileInstructions">
-        Tap the arrows to move and center circle to create effects.<br>
-        This message will disappear in a few seconds.
-    </div>
     <div id="soundButton">●</div>
-    <div id="debugInfo">Status: -</div>
 
     <script>
         // Game variables
@@ -148,7 +97,7 @@
         let gameStarted = false;
         let soundsLoaded = false;
         let soundInitialized = false;
-        let debugMode = true;
+        let debugMode = false; // Set to false to disable debug info
         
         // Mobile controls
         let leftButton, rightButton, upButton, downButton;
@@ -183,8 +132,6 @@
             }
             
             draw() {
-                updateDebugInfo();
-                
                 let frames;
                 if (this.right || this.last_direction === "right") {
                     frames = walkRight;
@@ -225,18 +172,16 @@
             }
             
             move() {
-                // FIXED: Movement logic is now in its own function
+                // Movement logic is now in its own function
                 if (this.left && this.x > 0) {
                     this.x -= this.vel;
                     this.last_direction = "left";
                     this.standing = false;
-                    updateDebugInfo("Moving left: " + this.x);
                 } 
                 else if (this.right && this.x < width - this.width) {
                     this.x += this.vel;
                     this.last_direction = "right";
                     this.standing = false;
-                    updateDebugInfo("Moving right: " + this.x);
                 }
                 else {
                     this.standing = true;
@@ -313,20 +258,6 @@
             }
         }
         
-        function updateDebugInfo(message) {
-            if (debugMode && gameStarted) {
-                const debugEl = document.getElementById('debugInfo');
-                if (debugEl) {
-                    if (message) {
-                        debugEl.textContent = message;
-                    } else {
-                        debugEl.textContent = `L:${soldier.left} R:${soldier.right} X:${Math.round(soldier.x)} Dir:${soldier.last_direction}`;
-                    }
-                    debugEl.style.display = 'block';
-                }
-            }
-        }
-        
         // Preload assets
         function preload() {
             // Load background
@@ -378,10 +309,6 @@
                 createCircles();
                 e.preventDefault();
             });
-            
-            // Enable sound status display
-            const soundStatus = document.getElementById('soundStatus');
-            soundStatus.style.display = 'block';
             
             // Create mobile control elements
             createMobileControls();
@@ -440,51 +367,35 @@
             upButton.style('display', 'flex');
             downButton.style('display', 'flex');
             document.getElementById('soundButton').style.display = 'flex';
-            
-            // Show instructions temporarily
-            const instructions = document.getElementById('mobileInstructions');
-            instructions.style.opacity = 1;
-            
-            // Hide instructions after 5 seconds
-            setTimeout(() => {
-                instructions.classList.add('hide-after');
-            }, 5000);
         }
         
         function setupMobileTouchHandlers() {
-            // COMPLETELY REWRITTEN MOBILE CONTROLS - USE DOM EVENTS INSTEAD OF P5
-            
             // Left button - using direct DOM events
             leftButton.elt.ontouchstart = function(e) {
                 soldier.left = true;
                 soldier.right = false;
-                updateDebugInfo("LEFT pressed");
                 e.preventDefault();
             };
             
             leftButton.elt.ontouchend = function() {
                 soldier.left = false;
-                updateDebugInfo("LEFT released");
             };
             
             // Right button
             rightButton.elt.ontouchstart = function(e) {
                 soldier.right = true;
                 soldier.left = false;
-                updateDebugInfo("RIGHT pressed");
                 e.preventDefault();
             };
             
             rightButton.elt.ontouchend = function() {
                 soldier.right = false;
-                updateDebugInfo("RIGHT released");
             };
             
             // Up button
             upButton.elt.ontouchstart = function(e) {
                 if (!soldier.is_jump) {
                     soldier.is_jump = true;
-                    updateDebugInfo("UP pressed - jumping");
                 }
                 e.preventDefault();
             };
@@ -492,19 +403,16 @@
             // Down button
             downButton.elt.ontouchstart = function(e) {
                 soldier.down = true;
-                updateDebugInfo("DOWN pressed");
                 e.preventDefault();
             };
             
             downButton.elt.ontouchend = function() {
                 soldier.down = false;
-                updateDebugInfo("DOWN released");
             };
             
             // Sound button
             document.getElementById('soundButton').ontouchstart = function(e) {
                 createCircles();
-                updateDebugInfo("SOUND pressed");
                 e.preventDefault();
             };
         }
@@ -529,11 +437,6 @@
             
             // Start the game
             gameStarted = true;
-            
-            // Debug
-            if (debugMode) {
-                document.getElementById('debugInfo').style.display = 'block';
-            }
         }
         
         // Function to unlock audio on iOS
@@ -557,9 +460,6 @@
         }
         
         function initSounds() {
-            // Update sound status
-            document.getElementById('soundStatus').textContent = 'Sound: Initializing...';
-            
             try {
                 // Force audio context to start
                 if (window.audioContext && window.audioContext.state === 'suspended') {
@@ -588,10 +488,8 @@
                 
                 soundsLoaded = true;
                 soundInitialized = true;
-                document.getElementById('soundStatus').textContent = 'Sound: Ready';
             } catch(e) {
                 console.error("Sound initialization failed:", e);
-                document.getElementById('soundStatus').textContent = 'Sound: Error';
             }
         }
         
@@ -675,7 +573,7 @@
                 }
             }
             
-            // COMPLETELY MOVED MOVEMENT LOGIC TO SOLDIER CLASS
+            // Movement logic
             soldier.move();
             
             // Handle space key for circles (desktop)
