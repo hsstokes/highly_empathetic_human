@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Animated Soldier</title>
+    <title>Animated Character</title>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
     <style>
@@ -39,22 +39,22 @@
         }
         .control-button {
             position: absolute;
-            width: 80px; /* Larger size */
-            height: 80px; /* Larger size */
-            background-color: rgba(255,255,255,0.5); /* More visible */
-            border: 3px solid rgba(0,0,0,0.3); /* Visible border */
+            width: 60px; /* Smaller size */
+            height: 60px; /* Smaller size */
+            background-color: rgba(255,255,255,0.3); /* More transparent */
+            border: 2px solid rgba(0,0,0,0.2); /* Less visible border */
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 36px; /* Larger font */
-            color: #333; /* Darker text */
+            font-size: 24px; /* Smaller font */
+            color: #555; /* Lighter text */
             user-select: none;
             -webkit-user-select: none;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2); /* Add shadow for depth */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
         }
         .control-button:active {
-            background-color: rgba(200,200,200,0.7); /* Visual feedback */
+            background-color: rgba(200,200,200,0.5);
         }
         #soundStatus {
             position: absolute;
@@ -68,17 +68,16 @@
             z-index: 100;
             display: none;
         }
-        /* Instructions overlay for mobile */
         #mobileInstructions {
             position: absolute;
-            bottom: 20px;
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
             background-color: rgba(0,0,0,0.6);
             color: white;
-            padding: 10px 15px;
+            padding: 8px 12px;
             border-radius: 5px;
-            font-size: 14px;
+            font-size: 12px;
             text-align: center;
             z-index: 90;
             max-width: 80%;
@@ -96,7 +95,7 @@
     </div>
     <div id="soundStatus">Sound: Initializing...</div>
     <div id="mobileInstructions">
-        Use the control buttons to move and shoot.<br>
+        Tap the arrows to move and center to play sound.<br>
         This message will disappear in a few seconds.
     </div>
 
@@ -184,21 +183,37 @@
             }
         }
         
-        // Projectile class (matches your Python class)
-        class Projectile {
-            constructor(x, y, radius, colour, direction) {
+        // Circle effect (replacing bullet)
+        class SoundCircle {
+            constructor(x, y, radius, colour) {
                 this.x = x;
                 this.y = y;
                 this.radius = radius;
+                this.maxRadius = radius * 5;
                 this.colour = colour;
-                this.direction = direction;
-                this.vel = 8 * direction;
+                this.growing = true;
+                this.alpha = 255;
             }
             
             draw() {
-                fill(this.colour);
+                // Fade out as it grows
                 noStroke();
+                fill(red(this.colour), green(this.colour), blue(this.colour), this.alpha);
                 circle(this.x, this.y, this.radius * 2);
+                
+                // Update radius and alpha
+                if (this.growing) {
+                    this.radius += 2;
+                    this.alpha -= 5;
+                    
+                    if (this.radius >= this.maxRadius) {
+                        this.growing = false;
+                    }
+                }
+            }
+            
+            isFinished() {
+                return this.alpha <= 0;
             }
         }
         
@@ -207,7 +222,7 @@
             // Load background
             gridImg = loadImage('images/grid_img.jpeg');
             
-            // Load soldier images
+            // Load character images
             for (let i = 1; i <= 6; i++) {
                 walkRight.push(loadImage(`soldier/${i}.png`));
                 walkLeft.push(loadImage(`soldier/L${i}.png`));
@@ -230,8 +245,8 @@
                 canvas = createCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
             }
             
-            // Create soldier
-            soldier = new Player(50, 250, 250, 250);
+            // Create character
+            soldier = new Player(width/2 - 125, height/2 - 125, 250, 250);
             
             // Always enable touch controls on mobile
             touchControls = true;
@@ -264,47 +279,50 @@
         }
         
         function createMobileControls() {
-            const buttonSize = min(width, height) / 6; // Larger buttons
+            // Create smaller, more subtle controls at the edges of the screen
+            const bottomPadding = 20;
+            const sidePadding = 20;
+            const buttonSize = 60; // Smaller size
             
             // Create control buttons
             leftButton = {
-                x: buttonSize, 
-                y: height - buttonSize * 2,
-                size: buttonSize * 1.5,
+                x: sidePadding, 
+                y: height - buttonSize - bottomPadding,
+                size: buttonSize,
                 pressed: false,
-                element: createControlButton('←', buttonSize, height - buttonSize * 2)
+                element: createControlButton('←', sidePadding, height - buttonSize - bottomPadding)
             };
             
             rightButton = {
-                x: buttonSize * 3.5, 
-                y: height - buttonSize * 2,
-                size: buttonSize * 1.5,
+                x: width - buttonSize - sidePadding, 
+                y: height - buttonSize - bottomPadding,
+                size: buttonSize,
                 pressed: false,
-                element: createControlButton('→', buttonSize * 3.5, height - buttonSize * 2)
+                element: createControlButton('→', width - buttonSize - sidePadding, height - buttonSize - bottomPadding)
             };
             
             upButton = {
-                x: buttonSize * 2.25, 
-                y: height - buttonSize * 3.5,
-                size: buttonSize * 1.5,
+                x: width/2 - buttonSize/2, 
+                y: height - 2*buttonSize - bottomPadding,
+                size: buttonSize,
                 pressed: false,
-                element: createControlButton('↑', buttonSize * 2.25, height - buttonSize * 3.5)
+                element: createControlButton('↑', width/2 - buttonSize/2, height - 2*buttonSize - bottomPadding)
             };
             
             downButton = {
-                x: buttonSize * 2.25, 
-                y: height - buttonSize * 0.5,
-                size: buttonSize * 1.5,
+                x: width/2 - buttonSize/2, 
+                y: height - buttonSize - bottomPadding,
+                size: buttonSize,
                 pressed: false,
-                element: createControlButton('↓', buttonSize * 2.25, height - buttonSize * 0.5)
+                element: createControlButton('↓', width/2 - buttonSize/2, height - buttonSize - bottomPadding)
             };
             
             fireButton = {
-                x: width - buttonSize * 2, 
-                y: height - buttonSize * 2,
-                size: buttonSize * 2,
+                x: width/2 - buttonSize/2, 
+                y: height - 1.5*buttonSize - bottomPadding,
+                size: buttonSize,
                 pressed: false,
-                element: createControlButton('🔫', width - buttonSize * 2, height - buttonSize * 2)
+                element: createControlButton('●', width/2 - buttonSize/2, height - 1.5*buttonSize - bottomPadding)
             };
             
             // Hide controls until game starts
@@ -384,10 +402,10 @@
                 downButton.pressed = false;
             });
             
-            // Fire button
+            // Sound button (renamed from "fire")
             fireButton.element.elt.addEventListener('touchstart', function(e) {
                 if (shoot === 0) {
-                    fireBullet();
+                    playSound();
                     shoot = 1;
                 }
                 e.preventDefault();
@@ -443,30 +461,24 @@
             }
         }
         
-        function fireBullet() {
-            // Play both sounds when firing - this is what the user wants
+        function playSound() {
+            // Play both sounds - this is what the user wants
             if (soundsLoaded) {
                 if (window.audioContext && window.audioContext.state === 'suspended') {
                     window.audioContext.resume();
                 }
                 
                 bulletSound.play();
-                hitSound.play(); // Play hit sound when firing regardless of hitting target
+                hitSound.play();
             }
             
-            // Determine direction based on soldier facing
-            const direction = (soldier.right || soldier.last_direction === "right") ? 1 : -1;
-            
-            // Create new bullet
-            if (bullets.length < 5) {
-                bullets.push(new Projectile(
-                    soldier.x + soldier.width / 2,
-                    soldier.y + soldier.height / 2,
-                    6, 
-                    color(0, 100, 0), // dark green
-                    direction
-                ));
-            }
+            // Create a circular effect (not a bullet)
+            bullets.push(new SoundCircle(
+                soldier.x + soldier.width / 2,
+                soldier.y + soldier.height / 2,
+                10, 
+                color(0, 200, 100, 200) // green with transparency
+            ));
         }
         
         function draw() {
@@ -475,17 +487,14 @@
             // Draw background
             image(gridImg, 0, 0, width, height);
             
-            // Update bullets
+            // Update circle effects
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].x += bullets[i].vel;
-                
-                // Remove bullets that are off-screen
-                if (bullets[i].x < 0 || bullets[i].x > width) {
-                    bullets.splice(i, 1);
-                    continue;
-                }
-                
                 bullets[i].draw();
+                
+                // Remove finished circles
+                if (bullets[i].isFinished()) {
+                    bullets.splice(i, 1);
+                }
             }
             
             // Handle keyboard and touch input
@@ -551,9 +560,9 @@
                 soldier.standing = true;
             }
             
-            // Handle space key for shooting (desktop)
+            // Handle space key for sound (desktop)
             if (keyIsDown(32) && shoot === 0) { // 32 is space key
-                fireBullet();
+                playSound();
                 shoot = 1;
             }
             
@@ -579,26 +588,28 @@
             
             // Reposition mobile controls
             if (gameStarted) {
-                const buttonSize = min(width, height) / 6;
+                const bottomPadding = 20;
+                const sidePadding = 20;
+                const buttonSize = 60;
                 
-                leftButton.x = buttonSize;
-                leftButton.y = height - buttonSize * 2;
+                leftButton.x = sidePadding;
+                leftButton.y = height - buttonSize - bottomPadding;
                 leftButton.element.position(leftButton.x, leftButton.y);
                 
-                rightButton.x = buttonSize * 3.5;
-                rightButton.y = height - buttonSize * 2;
+                rightButton.x = width - buttonSize - sidePadding;
+                rightButton.y = height - buttonSize - bottomPadding;
                 rightButton.element.position(rightButton.x, rightButton.y);
                 
-                upButton.x = buttonSize * 2.25;
-                upButton.y = height - buttonSize * 3.5;
+                upButton.x = width/2 - buttonSize/2;
+                upButton.y = height - 2*buttonSize - bottomPadding;
                 upButton.element.position(upButton.x, upButton.y);
                 
-                downButton.x = buttonSize * 2.25;
-                downButton.y = height - buttonSize * 0.5;
+                downButton.x = width/2 - buttonSize/2;
+                downButton.y = height - buttonSize - bottomPadding;
                 downButton.element.position(downButton.x, downButton.y);
                 
-                fireButton.x = width - buttonSize * 2;
-                fireButton.y = height - buttonSize * 2;
+                fireButton.x = width/2 - buttonSize/2;
+                fireButton.y = height - 1.5*buttonSize - bottomPadding;
                 fireButton.element.position(fireButton.x, fireButton.y);
             }
         }
