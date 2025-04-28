@@ -39,19 +39,19 @@
         }
         .control-button {
             position: absolute;
-            width: 60px; /* Smaller size */
-            height: 60px; /* Smaller size */
-            background-color: rgba(255,255,255,0.3); /* More transparent */
-            border: 2px solid rgba(0,0,0,0.2); /* Less visible border */
+            width: 50px; /* Even smaller */
+            height: 50px; /* Even smaller */
+            background-color: rgba(255,255,255,0.3);
+            border: 1px solid rgba(0,0,0,0.2);
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 24px; /* Smaller font */
-            color: #555; /* Lighter text */
+            font-size: 20px;
+            color: #555;
             user-select: none;
             -webkit-user-select: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .control-button:active {
             background-color: rgba(200,200,200,0.5);
@@ -87,6 +87,28 @@
             opacity: 0;
             pointer-events: none;
         }
+        #soundButton {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255,255,255,0.3);
+            border: 1px solid rgba(0,0,0,0.2);
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: #555;
+            user-select: none;
+            -webkit-user-select: none;
+            z-index: 100;
+        }
+        #soundButton:active {
+            background-color: rgba(200,200,200,0.5);
+        }
     </style>
 </head>
 <body>
@@ -95,9 +117,10 @@
     </div>
     <div id="soundStatus">Sound: Initializing...</div>
     <div id="mobileInstructions">
-        Tap the arrows to move and center to play sound.<br>
+        Tap the arrows to move and center circle to play sound.<br>
         This message will disappear in a few seconds.
     </div>
+    <div id="soundButton">●</div>
 
     <script>
         // Game variables
@@ -109,11 +132,10 @@
         let shoot = 0;
         let gameStarted = false;
         let soundsLoaded = false;
-        let touchControls = false;
         let soundInitialized = false;
         
         // Mobile controls
-        let leftButton, rightButton, upButton, downButton, fireButton;
+        let leftButton, rightButton, upButton, downButton;
         
         // Canvas dimensions
         const W_WIDTH = 600;
@@ -183,37 +205,21 @@
             }
         }
         
-        // Circle effect (replacing bullet)
-        class SoundCircle {
-            constructor(x, y, radius, colour) {
+        // Projectile class (back to the original)
+        class Projectile {
+            constructor(x, y, radius, colour, direction) {
                 this.x = x;
                 this.y = y;
                 this.radius = radius;
-                this.maxRadius = radius * 5;
                 this.colour = colour;
-                this.growing = true;
-                this.alpha = 255;
+                this.direction = direction;
+                this.vel = 8 * direction;
             }
             
             draw() {
-                // Fade out as it grows
+                fill(this.colour);
                 noStroke();
-                fill(red(this.colour), green(this.colour), blue(this.colour), this.alpha);
                 circle(this.x, this.y, this.radius * 2);
-                
-                // Update radius and alpha
-                if (this.growing) {
-                    this.radius += 2;
-                    this.alpha -= 5;
-                    
-                    if (this.radius >= this.maxRadius) {
-                        this.growing = false;
-                    }
-                }
-            }
-            
-            isFinished() {
-                return this.alpha <= 0;
             }
         }
         
@@ -245,16 +251,20 @@
                 canvas = createCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
             }
             
-            // Create character
-            soldier = new Player(width/2 - 125, height/2 - 125, 250, 250);
-            
-            // Always enable touch controls on mobile
-            touchControls = true;
+            // Create character - SMALLER SIZE
+            soldier = new Player(width/2 - 75, height/2 - 75, 150, 150); // Reduced from 250x250
             
             // Set up start button
             document.getElementById('startButton').addEventListener('click', startGame);
             document.getElementById('startButton').addEventListener('touchstart', function(e) {
                 startGame();
+                e.preventDefault();
+            });
+            
+            // Sound button for mobiles
+            document.getElementById('soundButton').addEventListener('click', fireBullet);
+            document.getElementById('soundButton').addEventListener('touchstart', function(e) {
+                fireBullet();
                 e.preventDefault();
             });
             
@@ -281,49 +291,13 @@
         function createMobileControls() {
             // Create smaller, more subtle controls at the edges of the screen
             const bottomPadding = 20;
-            const sidePadding = 20;
-            const buttonSize = 60; // Smaller size
+            const buttonSize = 50; // Smaller size
             
             // Create control buttons
-            leftButton = {
-                x: sidePadding, 
-                y: height - buttonSize - bottomPadding,
-                size: buttonSize,
-                pressed: false,
-                element: createControlButton('←', sidePadding, height - buttonSize - bottomPadding)
-            };
-            
-            rightButton = {
-                x: width - buttonSize - sidePadding, 
-                y: height - buttonSize - bottomPadding,
-                size: buttonSize,
-                pressed: false,
-                element: createControlButton('→', width - buttonSize - sidePadding, height - buttonSize - bottomPadding)
-            };
-            
-            upButton = {
-                x: width/2 - buttonSize/2, 
-                y: height - 2*buttonSize - bottomPadding,
-                size: buttonSize,
-                pressed: false,
-                element: createControlButton('↑', width/2 - buttonSize/2, height - 2*buttonSize - bottomPadding)
-            };
-            
-            downButton = {
-                x: width/2 - buttonSize/2, 
-                y: height - buttonSize - bottomPadding,
-                size: buttonSize,
-                pressed: false,
-                element: createControlButton('↓', width/2 - buttonSize/2, height - buttonSize - bottomPadding)
-            };
-            
-            fireButton = {
-                x: width/2 - buttonSize/2, 
-                y: height - 1.5*buttonSize - bottomPadding,
-                size: buttonSize,
-                pressed: false,
-                element: createControlButton('●', width/2 - buttonSize/2, height - 1.5*buttonSize - bottomPadding)
-            };
+            leftButton = createControlButton('←', 20, height - buttonSize - bottomPadding);
+            rightButton = createControlButton('→', width - buttonSize - 20, height - buttonSize - bottomPadding);
+            upButton = createControlButton('↑', width/2 - buttonSize/2, height - buttonSize - bottomPadding - 70);
+            downButton = createControlButton('↓', width/2 - buttonSize/2, height - buttonSize - bottomPadding);
             
             // Hide controls until game starts
             hideControls();
@@ -338,19 +312,19 @@
         }
         
         function hideControls() {
-            leftButton.element.style('display', 'none');
-            rightButton.element.style('display', 'none');
-            upButton.element.style('display', 'none');
-            downButton.element.style('display', 'none');
-            fireButton.element.style('display', 'none');
+            leftButton.style('display', 'none');
+            rightButton.style('display', 'none');
+            upButton.style('display', 'none');
+            downButton.style('display', 'none');
+            document.getElementById('soundButton').style.display = 'none';
         }
         
         function showControls() {
-            leftButton.element.style('display', 'flex');
-            rightButton.element.style('display', 'flex');
-            upButton.element.style('display', 'flex');
-            downButton.element.style('display', 'flex');
-            fireButton.element.style('display', 'flex');
+            leftButton.style('display', 'flex');
+            rightButton.style('display', 'flex');
+            upButton.style('display', 'flex');
+            downButton.style('display', 'flex');
+            document.getElementById('soundButton').style.display = 'flex';
             
             // Set up touch handlers
             setupMobileTouchHandlers();
@@ -367,48 +341,40 @@
         
         function setupMobileTouchHandlers() {
             // Left button
-            leftButton.element.elt.addEventListener('touchstart', function(e) {
-                leftButton.pressed = true;
+            leftButton.elt.addEventListener('touchstart', function(e) {
+                soldier.left = true;
+                soldier.right = false;
                 e.preventDefault();
             });
-            leftButton.element.elt.addEventListener('touchend', function() {
-                leftButton.pressed = false;
+            leftButton.elt.addEventListener('touchend', function() {
+                soldier.left = false;
             });
             
             // Right button
-            rightButton.element.elt.addEventListener('touchstart', function(e) {
-                rightButton.pressed = true;
+            rightButton.elt.addEventListener('touchstart', function(e) {
+                soldier.right = true;
+                soldier.left = false;
                 e.preventDefault();
             });
-            rightButton.element.elt.addEventListener('touchend', function() {
-                rightButton.pressed = false;
+            rightButton.elt.addEventListener('touchend', function() {
+                soldier.right = false;
             });
             
             // Up button
-            upButton.element.elt.addEventListener('touchstart', function(e) {
-                upButton.pressed = true;
+            upButton.elt.addEventListener('touchstart', function(e) {
+                if (!soldier.is_jump) {
+                    soldier.is_jump = true;
+                }
                 e.preventDefault();
-            });
-            upButton.element.elt.addEventListener('touchend', function() {
-                upButton.pressed = false;
             });
             
             // Down button
-            downButton.element.elt.addEventListener('touchstart', function(e) {
-                downButton.pressed = true;
+            downButton.elt.addEventListener('touchstart', function(e) {
+                soldier.down = true;
                 e.preventDefault();
             });
-            downButton.element.elt.addEventListener('touchend', function() {
-                downButton.pressed = false;
-            });
-            
-            // Sound button (renamed from "fire")
-            fireButton.element.elt.addEventListener('touchstart', function(e) {
-                if (shoot === 0) {
-                    playSound();
-                    shoot = 1;
-                }
-                e.preventDefault();
+            downButton.elt.addEventListener('touchend', function() {
+                soldier.down = false;
             });
         }
         
@@ -421,7 +387,7 @@
                 window.audioContext.resume();
             }
             
-            // Simple sound initialization - no multiple attempts
+            // Initialize sounds
             initSounds();
             
             // Show mobile controls
@@ -436,12 +402,19 @@
             document.getElementById('soundStatus').textContent = 'Sound: Initializing...';
             
             try {
-                // Try to unlock the audio context
+                // Forcefully create a user interaction to unlock audio
                 if (window.audioContext && window.audioContext.state === 'suspended') {
                     window.audioContext.resume();
                 }
                 
-                // Play and immediately stop both sounds to initialize them
+                // Play silent sounds to initialize
+                const silentBuffer = window.audioContext.createBuffer(1, 1, 22050);
+                const source = window.audioContext.createBufferSource();
+                source.buffer = silentBuffer;
+                source.connect(window.audioContext.destination);
+                source.start(0);
+                
+                // Try to enable sounds
                 if (bulletSound && typeof bulletSound.play === 'function') {
                     bulletSound.play();
                     bulletSound.stop();
@@ -461,24 +434,38 @@
             }
         }
         
-        function playSound() {
-            // Play both sounds - this is what the user wants
-            if (soundsLoaded) {
-                if (window.audioContext && window.audioContext.state === 'suspended') {
-                    window.audioContext.resume();
-                }
-                
-                bulletSound.play();
-                hitSound.play();
+        function fireBullet() {
+            // Try to force audio context resume on each fire attempt
+            if (window.audioContext && window.audioContext.state === 'suspended') {
+                window.audioContext.resume();
             }
             
-            // Create a circular effect (not a bullet)
-            bullets.push(new SoundCircle(
-                soldier.x + soldier.width / 2,
-                soldier.y + soldier.height / 2,
-                10, 
-                color(0, 200, 100, 200) // green with transparency
-            ));
+            // Play sounds
+            if (soundsLoaded) {
+                try {
+                    bulletSound.play();
+                    hitSound.play();
+                } catch(e) {
+                    console.error("Sound play failed:", e);
+                }
+            }
+            
+            // Get direction based on character facing
+            const direction = (soldier.right || soldier.last_direction === "right") ? 1 : -1;
+            
+            // Create bullet
+            if (bullets.length < 5) {
+                bullets.push(new Projectile(
+                    soldier.x + soldier.width / 2,
+                    soldier.y + soldier.height / 2,
+                    6, 
+                    color(0, 100, 0), // dark green
+                    direction
+                ));
+            }
+            
+            // Set cooldown
+            shoot = 1;
         }
         
         function draw() {
@@ -487,83 +474,55 @@
             // Draw background
             image(gridImg, 0, 0, width, height);
             
-            // Update circle effects
+            // Update bullets
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].draw();
+                bullets[i].x += bullets[i].vel;
                 
-                // Remove finished circles
-                if (bullets[i].isFinished()) {
+                // Remove bullets that are off-screen
+                if (bullets[i].x < 0 || bullets[i].x > width) {
                     bullets.splice(i, 1);
+                    continue;
                 }
+                
+                bullets[i].draw();
             }
             
-            // Handle keyboard and touch input
-            let moved = false;
-            
-            if ((keyIsDown(LEFT_ARROW) || leftButton.pressed) && soldier.x > 0) {
+            // Update character position based on controls
+            if (soldier.left && soldier.x > 0) {
                 soldier.x -= soldier.vel;
-                soldier.left = true;
-                soldier.right = false;
-                soldier.up = false;
-                soldier.down = false;
-                soldier.standing = false;
                 soldier.last_direction = "left";
-                moved = true;
-            } 
-            else if ((keyIsDown(RIGHT_ARROW) || rightButton.pressed) && soldier.x < width - soldier.width) {
-                soldier.x += soldier.vel;
-                soldier.right = true;
-                soldier.left = false;
-                soldier.up = false;
-                soldier.down = false;
                 soldier.standing = false;
+            } 
+            else if (soldier.right && soldier.x < width - soldier.width) {
+                soldier.x += soldier.vel;
                 soldier.last_direction = "right";
-                moved = true;
+                soldier.standing = false;
+            }
+            else {
+                soldier.standing = true;
             }
             
             // Handle jumping mechanics
-            if (!soldier.is_jump) {
-                // Start jump if UP is pressed and not already jumping
-                if ((keyIsDown(UP_ARROW) || upButton.pressed)) {
-                    soldier.is_jump = true;
-                    soldier.right = false;
-                    soldier.left = false;
-                    soldier.up = true;
-                    soldier.down = false;
-                    soldier.standing = false;
-                    moved = true;
-                }
-                // Handle DOWN movement when not jumping
-                else if ((keyIsDown(DOWN_ARROW) || downButton.pressed) && soldier.y < height - soldier.height) {
-                    soldier.y += soldier.vel;
-                    soldier.down = true;
-                    soldier.up = false;
-                    soldier.left = false;
-                    soldier.right = false;
-                    soldier.standing = false;
-                    moved = true;
-                }
-            } else {
+            if (soldier.is_jump) {
                 // Handle jumping physics
                 if (soldier.jump_count >= -10) {
                     const neg = soldier.jump_count < 0 ? -1 : 1;
                     soldier.y -= (soldier.jump_count ** 2) * neg * 0.5;
                     soldier.jump_count -= 1;
-                    moved = true;
                 } else {
                     soldier.is_jump = false;
                     soldier.jump_count = 10;
                 }
             }
             
-            if (!moved) {
-                soldier.standing = true;
+            // Handle down movement when not jumping
+            if (soldier.down && !soldier.is_jump && soldier.y < height - soldier.height) {
+                soldier.y += soldier.vel;
             }
             
-            // Handle space key for sound (desktop)
+            // Handle space key for shooting (desktop)
             if (keyIsDown(32) && shoot === 0) { // 32 is space key
-                playSound();
-                shoot = 1;
+                fireBullet();
             }
             
             // Handle shoot cooldown
@@ -574,7 +533,7 @@
                 shoot = 0;
             }
             
-            // Draw soldier
+            // Draw character
             soldier.draw();
         }
         
@@ -589,36 +548,27 @@
             // Reposition mobile controls
             if (gameStarted) {
                 const bottomPadding = 20;
-                const sidePadding = 20;
-                const buttonSize = 60;
+                const buttonSize = 50;
                 
-                leftButton.x = sidePadding;
-                leftButton.y = height - buttonSize - bottomPadding;
-                leftButton.element.position(leftButton.x, leftButton.y);
+                leftButton.position(20, height - buttonSize - bottomPadding);
+                rightButton.position(width - buttonSize - 20, height - buttonSize - bottomPadding);
+                upButton.position(width/2 - buttonSize/2, height - buttonSize - bottomPadding - 70);
+                downButton.position(width/2 - buttonSize/2, height - buttonSize - bottomPadding);
                 
-                rightButton.x = width - buttonSize - sidePadding;
-                rightButton.y = height - buttonSize - bottomPadding;
-                rightButton.element.position(rightButton.x, rightButton.y);
-                
-                upButton.x = width/2 - buttonSize/2;
-                upButton.y = height - 2*buttonSize - bottomPadding;
-                upButton.element.position(upButton.x, upButton.y);
-                
-                downButton.x = width/2 - buttonSize/2;
-                downButton.y = height - buttonSize - bottomPadding;
-                downButton.element.position(downButton.x, downButton.y);
-                
-                fireButton.x = width/2 - buttonSize/2;
-                fireButton.y = height - 1.5*buttonSize - bottomPadding;
-                fireButton.element.position(fireButton.x, fireButton.y);
+                // Adjust sound button
+                const soundBtn = document.getElementById('soundButton');
+                soundBtn.style.bottom = (bottomPadding + 70) + 'px';
             }
         }
         
         // Additional handler to help with iOS audio
         function touchStarted() {
             if (window.audioContext && window.audioContext.state === 'suspended') {
-                window.audioContext.resume();
+                window.audioContext.resume().then(() => {
+                    console.log("AudioContext resumed");
+                });
             }
+            return false;
         }
     </script>
 </body>
