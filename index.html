@@ -39,8 +39,8 @@
         }
         .control-button {
             position: absolute;
-            width: 50px; /* Even smaller */
-            height: 50px; /* Even smaller */
+            width: 50px;
+            height: 50px;
             background-color: rgba(255,255,255,0.3);
             border: 1px solid rgba(0,0,0,0.2);
             border-radius: 50%;
@@ -117,7 +117,7 @@
     </div>
     <div id="soundStatus">Sound: Initializing...</div>
     <div id="mobileInstructions">
-        Tap the arrows to move and center circle to play sound.<br>
+        Tap the arrows to move and center circle to create effects.<br>
         This message will disappear in a few seconds.
     </div>
     <div id="soundButton">●</div>
@@ -141,7 +141,7 @@
         const W_WIDTH = 600;
         const W_HEIGHT = 600;
         
-        // Player class (matches your Python class)
+        // Player class
         class Player {
             constructor(x, y, width, height) {
                 this.x = x;
@@ -182,10 +182,12 @@
                 let ctx = drawingContext;
                 ctx.save();
                 ctx.globalCompositeOperation = 'multiply';
-                ctx.globalAlpha = 0.9; // Equivalent to set_alpha(230)
+                ctx.globalAlpha = 0.9;
                 
                 // Draw the frame at exact dimensions
-                ctx.drawImage(frames[this.walkCount].canvas, this.x, this.y, this.width, this.height);
+                if (frames[this.walkCount] && frames[this.walkCount].canvas) {
+                    ctx.drawImage(frames[this.walkCount].canvas, this.x, this.y, this.width, this.height);
+                }
                 
                 // Restore canvas state
                 ctx.restore();
@@ -205,7 +207,7 @@
             }
         }
         
-        // Projectile class (back to the original)
+        // Circle effect (beautiful random circles)
         class Projectile {
             constructor(x, y, radius, colour, direction) {
                 this.x = x;
@@ -213,13 +215,47 @@
                 this.radius = radius;
                 this.colour = colour;
                 this.direction = direction;
-                this.vel = 8 * direction;
+                
+                // Random velocity components
+                const angle = random(0, TWO_PI);
+                const speed = random(2, 8);
+                this.velX = speed * cos(angle);
+                this.velY = speed * sin(angle);
+                
+                // Random lifetime
+                this.lifetime = random(30, 120);
+                this.age = 0;
+                this.growing = true;
+                this.maxRadius = radius * random(2, 5);
             }
             
             draw() {
-                fill(this.colour);
+                // Draw the circle
                 noStroke();
+                const alpha = map(this.age, 0, this.lifetime, 255, 0);
+                fill(red(this.colour), green(this.colour), blue(this.colour), alpha);
                 circle(this.x, this.y, this.radius * 2);
+                
+                // Update position
+                this.x += this.velX;
+                this.y += this.velY;
+                
+                // Update size
+                if (this.growing) {
+                    this.radius += 0.2;
+                    if (this.radius >= this.maxRadius) {
+                        this.growing = false;
+                    }
+                } else {
+                    this.radius = max(0, this.radius - 0.05);
+                }
+                
+                // Update age
+                this.age++;
+            }
+            
+            isFinished() {
+                return this.age >= this.lifetime;
             }
         }
         
@@ -234,25 +270,32 @@
                 walkLeft.push(loadImage(`soldier/L${i}.png`));
             }
             
-            // Simplified sound loading - no complex error handling
+            // Sound loading
             soundFormats('mp3', 'ogg');
-            bulletSound = loadSound('sounds/Bulletsound.mp3');
-            hitSound = loadSound('sounds/Hit.mp3');
+            bulletSound = loadSound('sounds/Bulletsound.mp3', () => {
+                console.log('Bullet sound loaded');
+            }, () => {
+                console.error('Bullet sound failed to load');
+            });
+            
+            hitSound = loadSound('sounds/Hit.mp3', () => {
+                console.log('Hit sound loaded');
+            }, () => {
+                console.error('Hit sound failed to load');
+            });
         }
         
         function setup() {
             // Create canvas matching game dimensions
             let canvas;
             if (windowWidth / windowHeight > W_WIDTH / W_HEIGHT) {
-                // Screen is wider than game aspect ratio
                 canvas = createCanvas(windowHeight * (W_WIDTH / W_HEIGHT), windowHeight);
             } else {
-                // Screen is taller than game aspect ratio
                 canvas = createCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
             }
             
-            // Create character - SMALLER SIZE
-            soldier = new Player(width/2 - 75, height/2 - 75, 150, 150); // Reduced from 250x250
+            // Create character with smaller size
+            soldier = new Player(width/2 - 75, height/2 - 75, 150, 150);
             
             // Set up start button
             document.getElementById('startButton').addEventListener('click', startGame);
@@ -262,9 +305,9 @@
             });
             
             // Sound button for mobiles
-            document.getElementById('soundButton').addEventListener('click', fireBullet);
+            document.getElementById('soundButton').addEventListener('click', createCircles);
             document.getElementById('soundButton').addEventListener('touchstart', function(e) {
-                fireBullet();
+                createCircles();
                 e.preventDefault();
             });
             
@@ -275,16 +318,14 @@
             // Create mobile control elements
             createMobileControls();
             
-            frameRate(12); // Match your Pygame frame rate
+            frameRate(24); // Smoother framerate
             
-            // Create AudioContext manually to help with sound issues
+            // Create AudioContext
             window.AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (!window.audioContext) {
-                try {
-                    window.audioContext = new AudioContext();
-                } catch(e) {
-                    console.error("Could not create AudioContext:", e);
-                }
+            try {
+                window.audioContext = new AudioContext();
+            } catch(e) {
+                console.error("Could not create AudioContext:", e);
             }
         }
         
@@ -340,20 +381,22 @@
         }
         
         function setupMobileTouchHandlers() {
-            // Left button
+            // FIXED LEFT MOVEMENT
             leftButton.elt.addEventListener('touchstart', function(e) {
                 soldier.left = true;
                 soldier.right = false;
+                soldier.last_direction = "left";
                 e.preventDefault();
             });
             leftButton.elt.addEventListener('touchend', function() {
                 soldier.left = false;
             });
             
-            // Right button
+            // FIXED RIGHT MOVEMENT
             rightButton.elt.addEventListener('touchstart', function(e) {
                 soldier.right = true;
                 soldier.left = false;
+                soldier.last_direction = "right";
                 e.preventDefault();
             });
             rightButton.elt.addEventListener('touchend', function() {
@@ -387,6 +430,9 @@
                 window.audioContext.resume();
             }
             
+            // Try to unlock audio on iOS
+            unlockAudio();
+            
             // Initialize sounds
             initSounds();
             
@@ -397,24 +443,46 @@
             gameStarted = true;
         }
         
+        // Function to unlock audio on iOS
+        function unlockAudio() {
+            // Play silent audio to unlock
+            const audioElement = document.createElement('audio');
+            audioElement.setAttribute('src', 'data:audio/mp3;base64,SUQzAwAAAAAAIlRJVDIAAAABAAAASVRTUwAAAAEAAABUQ09OAAAABAAAAE11c2ljLw==');
+            audioElement.setAttribute('playsinline', 'true');
+            audioElement.play();
+            
+            // Create and play a silent oscillator
+            if (window.audioContext) {
+                const oscillator = window.audioContext.createOscillator();
+                const gainNode = window.audioContext.createGain();
+                gainNode.gain.value = 0;
+                oscillator.connect(gainNode);
+                gainNode.connect(window.audioContext.destination);
+                oscillator.start(0);
+                oscillator.stop(0.001);
+            }
+        }
+        
         function initSounds() {
             // Update sound status
             document.getElementById('soundStatus').textContent = 'Sound: Initializing...';
             
             try {
-                // Forcefully create a user interaction to unlock audio
+                // Force audio context to start
                 if (window.audioContext && window.audioContext.state === 'suspended') {
-                    window.audioContext.resume();
+                    window.audioContext.resume().then(() => {
+                        console.log("AudioContext resumed by initSounds()");
+                    });
                 }
                 
-                // Play silent sounds to initialize
-                const silentBuffer = window.audioContext.createBuffer(1, 1, 22050);
-                const source = window.audioContext.createBufferSource();
-                source.buffer = silentBuffer;
-                source.connect(window.audioContext.destination);
-                source.start(0);
+                // Add a direct HTML5 audio for fallback
+                if (!window.backupAudio) {
+                    window.backupAudio = new Audio();
+                    window.backupAudio.src = 'sounds/Bulletsound.mp3';
+                    window.backupAudio.load();
+                }
                 
-                // Try to enable sounds
+                // Try playing with p5.sound
                 if (bulletSound && typeof bulletSound.play === 'function') {
                     bulletSound.play();
                     bulletSound.stop();
@@ -434,38 +502,68 @@
             }
         }
         
-        function fireBullet() {
-            // Try to force audio context resume on each fire attempt
-            if (window.audioContext && window.audioContext.state === 'suspended') {
-                window.audioContext.resume();
-            }
+        function createCircles() {
+            // Make multiple attempts to play sound
+            playSound();
             
-            // Play sounds
-            if (soundsLoaded) {
-                try {
-                    bulletSound.play();
-                    hitSound.play();
-                } catch(e) {
-                    console.error("Sound play failed:", e);
-                }
-            }
+            // Create multiple beautiful random circles
+            const numCircles = random(3, 8);
+            const centerX = soldier.x + soldier.width / 2;
+            const centerY = soldier.y + soldier.height / 2;
             
-            // Get direction based on character facing
-            const direction = (soldier.right || soldier.last_direction === "right") ? 1 : -1;
-            
-            // Create bullet
-            if (bullets.length < 5) {
+            for (let i = 0; i < numCircles; i++) {
+                const size = random(4, 10);
+                // Use a variety of green/blue colors
+                const circleColor = color(
+                    random(0, 50),  // low red
+                    random(100, 200), // high green
+                    random(50, 150)  // medium blue
+                );
+                
                 bullets.push(new Projectile(
-                    soldier.x + soldier.width / 2,
-                    soldier.y + soldier.height / 2,
-                    6, 
-                    color(0, 100, 0), // dark green
-                    direction
+                    centerX + random(-10, 10),
+                    centerY + random(-10, 10),
+                    size, 
+                    circleColor,
+                    1
                 ));
             }
             
             // Set cooldown
             shoot = 1;
+        }
+        
+        function playSound() {
+            // Multiple approaches to try to play sound
+            try {
+                // Approach 1: Use p5.sound
+                if (soundsLoaded) {
+                    if (window.audioContext && window.audioContext.state === 'suspended') {
+                        window.audioContext.resume();
+                    }
+                    
+                    if (bulletSound && typeof bulletSound.play === 'function') {
+                        bulletSound.play();
+                    }
+                    
+                    if (hitSound && typeof hitSound.play === 'function') {
+                        hitSound.play();
+                    }
+                }
+                
+                // Approach 2: Use direct HTML5 Audio API as fallback
+                if (window.backupAudio) {
+                    window.backupAudio.currentTime = 0;
+                    window.backupAudio.play().catch(e => console.log("HTML5 Audio fallback failed:", e));
+                }
+                
+                // Approach 3: Create a new Audio element each time (works on some mobile browsers)
+                const audio = new Audio('sounds/Bulletsound.mp3');
+                audio.play().catch(e => console.log("New Audio element failed:", e));
+                
+            } catch (e) {
+                console.error("All sound play attempts failed:", e);
+            }
         }
         
         function draw() {
@@ -476,26 +574,21 @@
             
             // Update bullets
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].x += bullets[i].vel;
-                
-                // Remove bullets that are off-screen
-                if (bullets[i].x < 0 || bullets[i].x > width) {
-                    bullets.splice(i, 1);
-                    continue;
-                }
-                
                 bullets[i].draw();
+                
+                // Remove finished bullets
+                if (bullets[i].isFinished()) {
+                    bullets.splice(i, 1);
+                }
             }
             
-            // Update character position based on controls
+            // FIXED: Update character position based on controls
             if (soldier.left && soldier.x > 0) {
                 soldier.x -= soldier.vel;
-                soldier.last_direction = "left";
                 soldier.standing = false;
             } 
             else if (soldier.right && soldier.x < width - soldier.width) {
                 soldier.x += soldier.vel;
-                soldier.last_direction = "right";
                 soldier.standing = false;
             }
             else {
@@ -504,7 +597,6 @@
             
             // Handle jumping mechanics
             if (soldier.is_jump) {
-                // Handle jumping physics
                 if (soldier.jump_count >= -10) {
                     const neg = soldier.jump_count < 0 ? -1 : 1;
                     soldier.y -= (soldier.jump_count ** 2) * neg * 0.5;
@@ -520,9 +612,9 @@
                 soldier.y += soldier.vel;
             }
             
-            // Handle space key for shooting (desktop)
+            // Handle space key for circles (desktop)
             if (keyIsDown(32) && shoot === 0) { // 32 is space key
-                fireBullet();
+                createCircles();
             }
             
             // Handle shoot cooldown
@@ -563,11 +655,13 @@
         
         // Additional handler to help with iOS audio
         function touchStarted() {
-            if (window.audioContext && window.audioContext.state === 'suspended') {
-                window.audioContext.resume().then(() => {
-                    console.log("AudioContext resumed");
-                });
-            }
+            unlockAudio();
+            return false;
+        }
+        
+        // Mouse click handler (for sound activation)
+        function mousePressed() {
+            unlockAudio();
             return false;
         }
     </script>
