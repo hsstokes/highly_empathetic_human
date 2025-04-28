@@ -128,10 +128,11 @@
                     this.walkCount = 0;
                 }
                 
-                // Draw with transparency (equivalent to alpha=230)
+                // Apply MULTIPLY blend mode (equivalent to pygame.BLEND_MULT)
                 push();
-                tint(255, 230);
+                blendMode(MULTIPLY);
                 image(frames[this.walkCount], this.x, this.y, this.width, this.height);
+                blendMode(BLEND); // Reset blend mode
                 pop();
                 
                 this.walkCount += 1;
@@ -178,33 +179,10 @@
                 walkLeft.push(loadImage(`soldier/L${i}.png`));
             }
             
-            // Load sounds (will activate after user interaction)
-            try {
-                soundFormats('mp3', 'ogg'); // Support both formats
-                bulletSound = loadSound(['sounds/Bulletsound.mp3', 'sounds/Bulletsound.ogg'], 
-                    () => console.log("Bullet sound loaded"),
-                    (e) => console.error("Failed to load bullet sound:", e)
-                );
-                hitSound = loadSound(['sounds/Hit.mp3', 'sounds/Hit.ogg'],
-                    () => console.log("Hit sound loaded"),
-                    (e) => console.error("Failed to load hit sound:", e)
-                );
-            } catch(e) {
-                console.error("Sound loading exception:", e);
-                // Create empty sound objects as fallbacks
-                bulletSound = { 
-                    play: () => {}, 
-                    stop: () => {}, 
-                    isPlaying: () => false,
-                    isLoaded: () => false 
-                };
-                hitSound = { 
-                    play: () => {}, 
-                    stop: () => {},
-                    isPlaying: () => false,
-                    isLoaded: () => false
-                };
-            }
+            // Simplified sound loading - no complex error handling
+            soundFormats('mp3', 'ogg');
+            bulletSound = loadSound('sounds/Bulletsound.mp3');
+            hitSound = loadSound('sounds/Hit.mp3');
         }
         
         function setup() {
@@ -358,7 +336,7 @@
                 window.audioContext.resume();
             }
             
-            // Initialize sounds with multiple attempts
+            // Simple sound initialization - no multiple attempts
             initSounds();
             
             // Show mobile controls if needed
@@ -374,97 +352,40 @@
             // Update sound status
             document.getElementById('soundStatus').textContent = 'Sound: Initializing...';
             
-            // Try to initialize sounds with multiple attempts
-            let initAttempts = 0;
-            const maxAttempts = 3;
-            
-            function attemptInit() {
-                try {
-                    // Try to unlock the audio context
-                    if (window.audioContext && window.audioContext.state === 'suspended') {
-                        window.audioContext.resume();
-                    }
-                    
-                    // Play and immediately stop both sounds to initialize them
-                    if (bulletSound && typeof bulletSound.play === 'function') {
-                        bulletSound.play();
-                        bulletSound.stop();
-                    }
-                    
-                    if (hitSound && typeof hitSound.play === 'function') {
-                        hitSound.play();
-                        hitSound.stop();
-                    }
-                    
-                    // Verify sounds are loaded
-                    if ((bulletSound && bulletSound.isLoaded && bulletSound.isLoaded()) ||
-                        (hitSound && hitSound.isLoaded && hitSound.isLoaded())) {
-                        soundsLoaded = true;
-                        soundInitialized = true;
-                        document.getElementById('soundStatus').textContent = 'Sound: Ready';
-                        
-                        // Play a test sound to confirm it's working
-                        setTimeout(() => {
-                            try {
-                                if (bulletSound && typeof bulletSound.play === 'function') {
-                                    bulletSound.play();
-                                }
-                            } catch(e) {
-                                console.log("Test sound playback error:", e);
-                            }
-                        }, 500);
-                        
-                        return;
-                    }
-                    
-                    // If not initialized and we haven't reached max attempts, try again
-                    initAttempts++;
-                    if (initAttempts < maxAttempts) {
-                        document.getElementById('soundStatus').textContent = `Sound: Retry ${initAttempts}/${maxAttempts}...`;
-                        setTimeout(attemptInit, 300);
-                    } else {
-                        document.getElementById('soundStatus').textContent = 'Sound: Failed (continue without sound)';
-                    }
-                } catch(e) {
-                    console.error("Sound initialization failed:", e);
-                    document.getElementById('soundStatus').textContent = 'Sound: Error';
-                    
-                    // Try one more time after a delay
-                    if (initAttempts < maxAttempts) {
-                        initAttempts++;
-                        setTimeout(attemptInit, 500);
-                    }
+            try {
+                // Try to unlock the audio context
+                if (window.audioContext && window.audioContext.state === 'suspended') {
+                    window.audioContext.resume();
                 }
+                
+                // Play and immediately stop both sounds to initialize them
+                if (bulletSound && typeof bulletSound.play === 'function') {
+                    bulletSound.play();
+                    bulletSound.stop();
+                }
+                
+                if (hitSound && typeof hitSound.play === 'function') {
+                    hitSound.play();
+                    hitSound.stop();
+                }
+                
+                soundsLoaded = true;
+                soundInitialized = true;
+                document.getElementById('soundStatus').textContent = 'Sound: Ready';
+            } catch(e) {
+                console.error("Sound initialization failed:", e);
+                document.getElementById('soundStatus').textContent = 'Sound: Error';
             }
-            
-            // Start the initialization attempts
-            attemptInit();
         }
         
         function fireBullet() {
-            // Play sounds if loaded
+            // Simplified sound playback - no complex error checking
             if (soundsLoaded) {
-                try {
-                    // Use touch event to help unlock sound on iOS
-                    if (window.audioContext && window.audioContext.state === 'suspended') {
-                        window.audioContext.resume();
-                    }
-                    
-                    if (bulletSound && typeof bulletSound.play === 'function') {
-                        bulletSound.play();
-                    }
-                    if (hitSound && typeof hitSound.play === 'function') {
-                        hitSound.play();
-                    }
-                } catch(e) {
-                    console.log("Sound playback error:", e);
-                    
-                    // If sound fails after being initialized, try to re-initialize
-                    if (soundInitialized) {
-                        soundInitialized = false;
-                        setTimeout(initSounds, 100);
-                    }
+                if (window.audioContext && window.audioContext.state === 'suspended') {
+                    window.audioContext.resume();
                 }
+                
+                bulletSound.play();
             }
             
             // Determine direction based on soldier facing
