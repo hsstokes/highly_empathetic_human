@@ -224,7 +224,7 @@
                 this.lifetime = random(30, 120);
                 this.age = 0;
                 this.growing = true;
-                this.maxRadius = radius * random(2, 5);
+                this.maxRadius = radius * random(3, 8); // Larger circles
             }
             
             draw() {
@@ -238,9 +238,9 @@
                 this.x += this.velX;
                 this.y += this.velY;
                 
-                // Update size
+                // Update size - faster growth
                 if (this.growing) {
-                    this.radius += 0.2;
+                    this.radius += 0.4; // Faster growth
                     if (this.radius >= this.maxRadius) {
                         this.growing = false;
                     }
@@ -283,8 +283,8 @@
                 canvas = createCanvas(windowWidth, windowWidth * (W_HEIGHT / W_WIDTH));
             }
             
-            // Create character with smaller size
-            soldier = new Player(width/2 - 75, height/2 - 75, 150, 150);
+            // Create character with MEDIUM size (175x175)
+            soldier = new Player(width/2 - 87.5, height/2 - 87.5, 175, 175);
             
             // Set up start button
             document.getElementById('startButton').addEventListener('click', startGame);
@@ -488,12 +488,12 @@
             playSound();
             
             // Create multiple beautiful random circles
-            const numCircles = random(3, 8);
+            const numCircles = random(4, 10); // More circles
             const centerX = soldier.x + soldier.width / 2;
             const centerY = soldier.y + soldier.height / 2;
             
             for (let i = 0; i < numCircles; i++) {
-                const size = random(4, 10);
+                const size = random(6, 15); // Larger initial size
                 // Use a variety of green/blue colors
                 const circleColor = color(
                     random(0, 50),  // low red
