@@ -379,13 +379,14 @@
         }
         
         function fireBullet() {
-            // Simplified sound playback - no complex error checking
+            // Play both sounds when firing - this is what the user wants
             if (soundsLoaded) {
                 if (window.audioContext && window.audioContext.state === 'suspended') {
                     window.audioContext.resume();
                 }
                 
                 bulletSound.play();
+                hitSound.play(); // Play hit sound when firing regardless of hitting target
             }
             
             // Determine direction based on soldier facing
