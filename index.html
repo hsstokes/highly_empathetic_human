@@ -307,7 +307,7 @@
             // Create mobile control elements
             createMobileControls();
             
-            frameRate(12); // Smoother framerate
+            frameRate(15); // Smoother framerate
             
             // Create AudioContext
             window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -322,25 +322,25 @@
             // Create control buttons with direct DOM manipulation
             leftButton = createElement('div', '←');
             leftButton.class('control-button');
-            leftButton.position(20, height - 80);
+            leftButton.position(20, height - 100);
             leftButton.attribute('id', 'leftButton');
             document.body.appendChild(leftButton.elt);
             
             rightButton = createElement('div', '→');
             rightButton.class('control-button');
-            rightButton.position(width - 80, height - 80);
+            rightButton.position(width - 80, height - 100);
             rightButton.attribute('id', 'rightButton');
             document.body.appendChild(rightButton.elt);
             
             upButton = createElement('div', '↑');
             upButton.class('control-button');
-            upButton.position(width/2 - 30, height - 160);
+            upButton.position(width/2 - 30, height - 180);
             upButton.attribute('id', 'upButton');
             document.body.appendChild(upButton.elt);
             
             downButton = createElement('div', '↓');
             downButton.class('control-button');
-            downButton.position(width/2 - 30, height - 80);
+            downButton.position(width/2 - 30, height - 100);
             downButton.attribute('id', 'downButton');
             document.body.appendChild(downButton.elt);
             
