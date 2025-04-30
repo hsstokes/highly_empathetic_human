@@ -23,6 +23,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
+            cursor: pointer; /* Show pointer cursor to indicate interactivity */
         }
         
         canvas {
@@ -57,33 +58,9 @@
             cursor: pointer;
         }
         
-        .control-button {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: rgba(255,255,255,0.5);
-            border: 2px solid rgba(0,0,0,0.3);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 15px;
-            color: #333;
-            user-select: none;
-            -webkit-user-select: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            cursor: pointer;
-            z-index: 100;
-        }
-        
-        .control-button:active, .control-button.active {
-            background-color: rgba(200,255,200,0.7);
-            transform: scale(0.95);
-        }
-        
         #soundButton {
             position: absolute;
-            bottom: 70px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             width: 40px;
@@ -94,7 +71,7 @@
             display: none;
             justify-content: center;
             align-items: center;
-            font-size: 24px;
+            font-size: 18px;
             color: #333;
             user-select: none;
             -webkit-user-select: none;
@@ -127,9 +104,6 @@
         let soundsLoaded = false;
         let soundInitialized = false;
         
-        // Mobile controls
-        let leftButton, rightButton, upButton, downButton;
-        
         // Canvas dimensions
         let W_WIDTH = 1920;
         let W_HEIGHT = 1920;
@@ -142,12 +116,6 @@
                 this.width = width;
                 this.height = height;
                 this.vel = 4;
-                this.is_jump = false;
-                this.jump_count = 10;
-                this.left = false;
-                this.right = false;
-                this.up = false;
-                this.down = false;
                 this.walkCount = 0;
                 this.standing = true;
                 this.last_direction = "right";
@@ -161,7 +129,7 @@
             
             draw() {
                 let frames;
-                if (this.right || this.last_direction === "right") {
+                if (this.last_direction === "right") {
                     frames = walkRight;
                 } else {
                     frames = walkLeft;
@@ -197,40 +165,6 @@
                     width: this.width - 150,
                     height: this.height - 150
                 };
-            }
-            
-            move() {
-                // Movement logic is now in its own function
-                if (this.left && this.x > 0) {
-                    this.x -= this.vel;
-                    this.last_direction = "left";
-                    this.standing = false;
-                } 
-                else if (this.right && this.x < width - this.width) {
-                    this.x += this.vel;
-                    this.last_direction = "right";
-                    this.standing = false;
-                }
-                else {
-                    this.standing = true;
-                }
-                
-                // Handle jumping mechanics
-                if (this.is_jump) {
-                    if (this.jump_count >= -10) {
-                        const neg = this.jump_count < 0 ? -1 : 1;
-                        this.y -= (this.jump_count ** 2) * neg * 0.5;
-                        this.jump_count -= 1;
-                    } else {
-                        this.is_jump = false;
-                        this.jump_count = 10;
-                    }
-                }
-                
-                // Handle down movement when not jumping
-                if (this.down && !this.is_jump && this.y < height - this.height) {
-                    this.y += this.vel;
-                }
             }
         }
         
@@ -323,6 +257,13 @@
             canvas = createCanvas(canvasWidth, canvasHeight);
             canvas.parent('p5-container');
             
+            // Make canvas clickable to trigger circles
+            canvas.mousePressed(createCircles);
+            canvas.touchStarted(function() {
+                createCircles();
+                return false;
+            });
+            
             // Create character with LARGER size (250x250)
             soldier = new Player(width/2 - 125, height/2 - 125, 250, 250);
             
@@ -340,8 +281,15 @@
                 e.preventDefault();
             });
             
-            // Create mobile control elements
-            createMobileControls();
+            // Add interaction to container div as well
+            document.getElementById('p5-container').addEventListener('click', createCircles);
+            document.getElementById('p5-container').addEventListener('touchstart', function(e) {
+                // Only trigger if game has started and not from control buttons
+                if (gameStarted && e.target.id !== 'soundButton') {
+                    createCircles();
+                    e.preventDefault();
+                }
+            });
             
             frameRate(12); // Smoother framerate
             
@@ -354,186 +302,12 @@
             }
         }
         
-        function createMobileControls() {
-            // Create control buttons with direct DOM manipulation
-            leftButton = createElement('div', '←');
-            leftButton.class('control-button');
-            leftButton.position(20, height - 100);
-            leftButton.attribute('id', 'leftButton');
-            document.body.appendChild(leftButton.elt);
-            
-            rightButton = createElement('div', '→');
-            rightButton.class('control-button');
-            rightButton.position(width - 80, height - 100);
-            rightButton.attribute('id', 'rightButton');
-            document.body.appendChild(rightButton.elt);
-            
-            upButton = createElement('div', '↑');
-            upButton.class('control-button');
-            upButton.position(width/2 - 30, height - 180);
-            upButton.attribute('id', 'upButton');
-            document.body.appendChild(upButton.elt);
-            
-            downButton = createElement('div', '↓');
-            downButton.class('control-button');
-            downButton.position(width/2 - 30, height - 100);
-            downButton.attribute('id', 'downButton');
-            document.body.appendChild(downButton.elt);
-            
-            // Add mouse and touch handlers
-            setupControlHandlers();
-            
-            // Hide controls until game starts
-            hideControls();
-        }
-        
         function hideControls() {
-            leftButton.style('display', 'none');
-            rightButton.style('display', 'none');
-            upButton.style('display', 'none');
-            downButton.style('display', 'none');
             document.getElementById('soundButton').style.display = 'none';
         }
         
         function showControls() {
-            leftButton.style('display', 'flex');
-            rightButton.style('display', 'flex');
-            upButton.style('display', 'flex');
-            downButton.style('display', 'flex');
             document.getElementById('soundButton').style.display = 'flex';
-        }
-        
-        function setupControlHandlers() {
-            // Add both mouse and touch handlers to buttons for desktop and mobile
-            
-            // LEFT BUTTON
-            // Mouse handlers
-            leftButton.elt.onmousedown = function(e) {
-                soldier.left = true;
-                soldier.right = false;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            leftButton.elt.onmouseup = leftButton.elt.onmouseleave = function() {
-                soldier.left = false;
-                this.classList.remove('active');
-            };
-            
-            // Touch handlers
-            leftButton.elt.ontouchstart = function(e) {
-                soldier.left = true;
-                soldier.right = false;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            leftButton.elt.ontouchend = function() {
-                soldier.left = false;
-                this.classList.remove('active');
-            };
-            
-            // RIGHT BUTTON
-            // Mouse handlers
-            rightButton.elt.onmousedown = function(e) {
-                soldier.right = true;
-                soldier.left = false;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            rightButton.elt.onmouseup = rightButton.elt.onmouseleave = function() {
-                soldier.right = false;
-                this.classList.remove('active');
-            };
-            
-            // Touch handlers
-            rightButton.elt.ontouchstart = function(e) {
-                soldier.right = true;
-                soldier.left = false;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            rightButton.elt.ontouchend = function() {
-                soldier.right = false;
-                this.classList.remove('active');
-            };
-            
-            // UP BUTTON
-            // Mouse handlers
-            upButton.elt.onmousedown = function(e) {
-                if (!soldier.is_jump) {
-                    soldier.is_jump = true;
-                }
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            upButton.elt.onmouseup = upButton.elt.onmouseleave = function() {
-                this.classList.remove('active');
-            };
-            
-            // Touch handlers
-            upButton.elt.ontouchstart = function(e) {
-                if (!soldier.is_jump) {
-                    soldier.is_jump = true;
-                }
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            upButton.elt.ontouchend = function() {
-                this.classList.remove('active');
-            };
-            
-            // DOWN BUTTON
-            // Mouse handlers
-            downButton.elt.onmousedown = function(e) {
-                soldier.down = true;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            downButton.elt.onmouseup = downButton.elt.onmouseleave = function() {
-                soldier.down = false;
-                this.classList.remove('active');
-            };
-            
-            // Touch handlers
-            downButton.elt.ontouchstart = function(e) {
-                soldier.down = true;
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            downButton.elt.ontouchend = function() {
-                soldier.down = false;
-                this.classList.remove('active');
-            };
-            
-            // SOUND BUTTON
-            // Mouse handlers
-            document.getElementById('soundButton').onmousedown = function(e) {
-                createCircles();
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            document.getElementById('soundButton').onmouseup = document.getElementById('soundButton').onmouseleave = function() {
-                this.classList.remove('active');
-            };
-            
-            // Touch handlers
-            document.getElementById('soundButton').ontouchstart = function(e) {
-                createCircles();
-                this.classList.add('active');
-                e.preventDefault();
-            };
-            
-            document.getElementById('soundButton').ontouchend = function() {
-                this.classList.remove('active');
-            };
         }
         
         function startGame() {
@@ -613,6 +387,9 @@
         }
         
         function createCircles() {
+            // Only proceed if game is started
+            if (!gameStarted) return;
+            
             // Make multiple attempts to play sound
             playSound();
             
@@ -641,6 +418,9 @@
             
             // Set cooldown
             shoot = 1;
+            
+            // Alternate the character direction for visual interest
+            soldier.last_direction = soldier.last_direction === "right" ? "left" : "right";
         }
         
         function playSound() {
@@ -676,36 +456,10 @@
             }
         }
         
-        // KEYBOARD CONTROL HANDLERS
+        // KEYBOARD CONTROL HANDLERS - Simplified to just spacebar
         function keyPressed() {
-            if (keyCode === LEFT_ARROW) {
-                soldier.left = true;
-                soldier.right = false;
-                if (document.getElementById('leftButton')) {
-                    document.getElementById('leftButton').classList.add('active');
-                }
-                return false;
-            } else if (keyCode === RIGHT_ARROW) {
-                soldier.right = true;
-                soldier.left = false;
-                if (document.getElementById('rightButton')) {
-                    document.getElementById('rightButton').classList.add('active');
-                }
-                return false;
-            } else if (keyCode === UP_ARROW && !soldier.is_jump) {
-                soldier.is_jump = true;
-                if (document.getElementById('upButton')) {
-                    document.getElementById('upButton').classList.add('active');
-                }
-                return false;
-            } else if (keyCode === DOWN_ARROW) {
-                soldier.down = true;
-                if (document.getElementById('downButton')) {
-                    document.getElementById('downButton').classList.add('active');
-                }
-                return false;
-            } else if (keyCode === 32) { // Space key
-                if (shoot === 0) {
+            if (keyCode === 32) { // Space key
+                if (gameStarted && shoot === 0) {
                     createCircles();
                     if (document.getElementById('soundButton')) {
                         document.getElementById('soundButton').classList.add('active');
@@ -716,32 +470,9 @@
         }
         
         function keyReleased() {
-            if (keyCode === LEFT_ARROW) {
-                soldier.left = false;
-                if (document.getElementById('leftButton')) {
-                    document.getElementById('leftButton').classList.remove('active');
-                }
-                return false;
-            } else if (keyCode === RIGHT_ARROW) {
-                soldier.right = false;
-                if (document.getElementById('rightButton')) {
-                    document.getElementById('rightButton').classList.remove('active');
-                }
-                return false;
-            } else if (keyCode === DOWN_ARROW) {
-                soldier.down = false;
-                if (document.getElementById('downButton')) {
-                    document.getElementById('downButton').classList.remove('active');
-                }
-                return false;
-            } else if (keyCode === 32) { // Space key
+            if (keyCode === 32) { // Space key
                 if (document.getElementById('soundButton')) {
                     document.getElementById('soundButton').classList.remove('active');
-                }
-                return false;
-            } else if (keyCode === UP_ARROW) {
-                if (document.getElementById('upButton')) {
-                    document.getElementById('upButton').classList.remove('active');
                 }
                 return false;
             }
@@ -785,9 +516,6 @@
                 }
             }
             
-            // Movement logic
-            soldier.move();
-            
             // Handle shoot cooldown
             if (shoot > 0) {
                 shoot += 1;
@@ -816,16 +544,11 @@
             
             resizeCanvas(canvasWidth, canvasHeight);
             
-            // Reposition mobile controls
+            // Reposition sound button
             if (gameStarted) {
-                leftButton.position(20, height - 80);
-                rightButton.position(width - 80, height - 80);
-                upButton.position(width/2 - 30, height - 160);
-                downButton.position(width/2 - 30, height - 80);
-                
                 // Adjust sound button
                 const soundBtn = document.getElementById('soundButton');
-                soundBtn.style.bottom = '160px';
+                soundBtn.style.bottom = '20px';
             }
         }
         
