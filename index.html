@@ -83,6 +83,19 @@
             background-color: rgba(200,255,200,0.7);
             transform: translateX(-50%) scale(0.95);
         }
+        
+        #nfcStatus {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0,0,0,0.6);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 100;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -91,6 +104,7 @@
         <button id="startButton">TAP TO START</button>
     </div>
     <div id="soundButton">●</div>
+    <div id="nfcStatus">NFC Ready</div>
 
     <script>
         // Game variables
@@ -103,6 +117,7 @@
         let gameStarted = false;
         let soundsLoaded = false;
         let soundInitialized = false;
+        let nfcEnabled = false;
         
         // Canvas dimensions
         let W_WIDTH = 1920;
@@ -300,6 +315,11 @@
             } catch(e) {
                 console.error("Could not create AudioContext:", e);
             }
+            
+            // Check for NFC API support
+            if ('NDEFReader' in window) {
+                nfcEnabled = true;
+            }
         }
         
         function hideControls() {
@@ -328,8 +348,42 @@
             // Show mobile controls
             showControls();
             
+            // Initialize NFC if available
+            if (nfcEnabled) {
+                startNFCReading();
+                document.getElementById('nfcStatus').style.display = 'block';
+            }
+            
             // Start the game
             gameStarted = true;
+        }
+        
+        // Function to start NFC reading
+        function startNFCReading() {
+            if ('NDEFReader' in window) {
+                const nfcStatus = document.getElementById('nfcStatus');
+                nfcStatus.textContent = "Scanning for NFC...";
+                
+                const ndef = new NDEFReader();
+                ndef.scan().then(() => {
+                    nfcStatus.textContent = "NFC Ready";
+                    
+                    ndef.addEventListener("reading", ({ message, serialNumber }) => {
+                        nfcStatus.textContent = "NFC Detected!";
+                        // Trigger the animation
+                        createCircles();
+                        
+                        // Reset status after 2 seconds
+                        setTimeout(() => {
+                            nfcStatus.textContent = "NFC Ready";
+                        }, 2000);
+                    });
+                    
+                }).catch(error => {
+                    nfcStatus.textContent = "NFC Error: " + error;
+                    console.error(`Error: ${error}`);
+                });
+            }
         }
         
         // Function to unlock audio on iOS
