@@ -402,9 +402,9 @@
                 const size = random(7, 16); // Larger initial size
                 // Use a variety of green/blue colors
                 const circleColor = color(
-                    random(210, 235),  // further reduced red
-                    random(200, 225), // further reduced green
-                    random(245, 255)  // maximized blue
+                    random(0, 40),  // low red
+                    random(100, 180), // medium green
+                    random(220, 255)  // high blue
                 );
                 
                 bullets.push(new Projectile(
