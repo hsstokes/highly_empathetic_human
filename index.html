@@ -146,7 +146,7 @@
         let walkRight = [];
         let walkLeft = [];
         let gridImg;
-        let bulletSound, hitSound;
+        let bulletSound;
         let bullets = [];
         let shoot = 0;
         let gameStarted = false;
@@ -281,9 +281,8 @@
             }
             
             // Sound loading
-            soundFormats('mp3', 'ogg');
+            soundFormats('mp3');
             bulletSound = loadSound('sounds/Bulletsound.mp3');
-            hitSound = loadSound('sounds/Hit.mp3');
         }
         
         function setup() {
@@ -423,11 +422,6 @@
                     bulletSound.stop();
                 }
                 
-                if (hitSound && typeof hitSound.play === 'function') {
-                    hitSound.play();
-                    hitSound.stop();
-                }
-                
                 soundsLoaded = true;
                 soundInitialized = true;
             } catch(e) {
@@ -484,12 +478,7 @@
                     if (bulletSound && typeof bulletSound.play === 'function') {
                         bulletSound.play();
                     }
-                    
-                    if (hitSound && typeof hitSound.play === 'function') {
-                        hitSound.play();
-                    }
                 }
-                
                 // Approach 2: Use direct HTML5 Audio API as fallback
                 if (window.backupAudio) {
                     window.backupAudio.currentTime = 0;
